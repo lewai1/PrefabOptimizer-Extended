@@ -1,12 +1,37 @@
 # Changelog
 
-All notable changes to PrefabOptimizer will be documented in this file.
+All notable changes to PrefabOptimizer-Extended will be documented in this file.
 
-This project currently follows the version from `manifest.json` and `pom.xml`.
+This project currently follows the version from `manifest.json` and `build.gradle.kts`.
 
-## [0.1.0] - 2026-04-15
+## [0.2.0-SNAPSHOT] - Unreleased — Extended fork
 
-Initial release of PrefabOptimizer.
+### Fork
+
+This version forks the original [PrefabOptimizer by Theobosse / ninesliced](https://ninesliced.com) and renames the project to **PrefabOptimizer-Extended**. The AGPL-3.0 license is unchanged and all upstream credit is preserved.
+
+### Changed
+
+- Rebranded artifact: `dev.ninesliced:PrefabOptimizer` → `dev.lewai:PrefabOptimizer-Extended`.
+- Moved Java package: `dev.ninesliced.prefaboptimizer.*` → `dev.lewai.prefaboptimizerextended.*` to avoid classloader collisions with the upstream mod.
+- Migrated the build system from Maven (`pom.xml`) to Gradle (`build.gradle.kts` + wrapper).
+- Player-facing chat prefixes and log lines now use `PrefabOptimizer-Extended` instead of `PrefabOptimizer` so the two mods are distinguishable in logs.
+- Manifest `Description` and `Authors` now credit Theobosse as original author and lewai1 as fork maintainer.
+
+### Planned in 0.2.0
+
+- Live progress bar with per-prefab progress updates and a cancel button.
+- O(1) neighbor lookups inside prefab batch optimization (HashMap indexing).
+- Cached block classification per optimization run.
+- Parallel prefab batch processing across CPU cores.
+- Warn on invalid exclusion regex instead of silently falling back to token matching.
+- Atomic prefab writes (temp + rename on success).
+- Dry-run / preview mode for destructive batches.
+- New optimization modes: aggressive cube, flood-fill interior, shell thickness.
+
+## [0.1.0] - 2026-04-15 — Upstream release by Theobosse
+
+Initial release of PrefabOptimizer by [Theobosse / ninesliced](https://ninesliced.com).
 
 ### Included
 
@@ -44,7 +69,7 @@ Initial release of PrefabOptimizer.
 - Batch optimization writes optimized prefab copies through `PrefabStore.savePrefabToPack(...)`.
 - Selection optimization runs through BuilderTools history using a custom `OccludedBlockMask`.
 
-### Known Limitations
+### Known Limitations (at 0.1.0)
 
 - Only the conservative hidden full-cube optimization mode exists in this release.
 - Batch prefab optimization writes prefab files and is not integrated with `/undo`.

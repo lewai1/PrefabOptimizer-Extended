@@ -1,20 +1,24 @@
 {
-  "Group": "dev.ninesliced",
-  "Name": "PrefabOptimizer",
-  "Version": "0.1.0",
-  "Description": "A practical Hytale builder tool for optimizing hidden full-cube blocks in selections and prefab batches.",
+  "Group": "dev.lewai",
+  "Name": "PrefabOptimizer-Extended",
+  "Version": "0.2.0",
+  "Description": "Extended fork of PrefabOptimizer by Theobosse (ninesliced.com). Removes hidden full-cube blocks from BuilderTools selections and prefab batches, with added performance and UX improvements (parallel batch, neighbor indexing, live progress, flood-fill interior mode).",
   "Authors": [
     {
-      "Name": "Theobosse",
+      "Name": "lewai1 (fork maintainer)",
+      "Url": "https://github.com/lewai1"
+    },
+    {
+      "Name": "Theobosse (original author)",
       "Email": "theodore.billotte@epitech.eu",
       "Url": "https://ninesliced.com"
     }
   ],
-  "Website": "https://ninesliced.com",
+  "Website": "https://github.com/lewai1/PrefabOptimizer-Extended",
   "ServerVersion": "2026.03.26-89796e57b",
   "Dependencies": {},
   "OptionalDependencies": {},
   "DisabledByDefault": false,
   "IncludesAssetPack": true,
-  "Main": "dev.ninesliced.prefaboptimizer.PrefabOptimizer"
+  "Main": "dev.lewai.prefaboptimizerextended.PrefabOptimizer"
 }

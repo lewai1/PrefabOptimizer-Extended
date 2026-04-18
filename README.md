@@ -1,10 +1,30 @@
-# PrefabOptimizer
+# PrefabOptimizer-Extended
 
-PrefabOptimizer is a Hytale builder utility mod that removes hidden, fully enclosed blocks from BuilderTools selections and prefab files. It is meant to turn an internal optimization script into a practical in-game tool that builders and mod creators can use without leaving Hytale.
+> **Fork notice.** This project is an extended fork of [PrefabOptimizer](https://ninesliced.com) originally created by **Theobosse / ninesliced**. All the original optimization logic, architecture, and BuilderTools integration is their work. PrefabOptimizer-Extended adds performance, UX, and optimization-mode improvements on top, while keeping the same `/prefaboptimizer` commands and the same AGPL-3.0 license.
+>
+> Please send a star and thanks to the original project: <https://ninesliced.com>.
 
-The optimizer keeps visible surfaces, entities, fluids, tints, and block component holders intact while removing blocks that are completely surrounded on all six faces by optimizable full-cube blocks.
+PrefabOptimizer-Extended is a Hytale builder utility mod that **removes hidden, fully enclosed blocks from BuilderTools selections and prefab files**. It turns an internal optimization script into a practical in-game tool that builders and mod creators can use without leaving Hytale.
 
-## Features
+The optimizer keeps visible surfaces, entities, fluids, tints, and block component holders intact while removing blocks that are completely surrounded by optimizable full-cube blocks.
+
+## Goals of the Extended fork
+
+The original mod ships a correct and conservative first mode. This fork is about making it **faster**, **nicer to use**, and **more aggressive when the builder asks for it**, without changing the conservative defaults.
+
+- **Faster batches.** Index prefab blocks for O(1) neighbor lookups, cache block classifications, parallelize prefab batch processing across CPU cores.
+- **Live progress.** Replace the fire-and-forget chat notification with a real progress bar in the GUI, per-prefab counters, and a cancel button.
+- **Better exclusion UX.** Warn when a regex fails to compile instead of silently falling back to token matching.
+- **Safer writes.** Atomic prefab writes (write to temp, rename on success) so a crash mid-batch never leaves half-written prefabs.
+- **New optimization modes (opt-in).**
+  - *Aggressive cube*: allow more block draw types as occluders.
+  - *Flood-fill interior*: 3D BFS from the exterior bounding box; anything unreachable from outside is considered interior and removable. Handles hollow caverns, sloped walls, and curved surfaces where the 6-neighbor rule misses large hidden volumes.
+  - *Shell thickness*: keep N layers of blocks from any exterior-visible face.
+- **Dry-run preview.** Report "X blocks would be removed across Y prefabs" without writing output, so you can validate before a destructive batch.
+
+See [`CHANGELOG.md`](./CHANGELOG.md) for what has actually shipped in each version.
+
+## Features (current)
 
 - Optimize the current BuilderTools selection from an in-game GUI.
 - Queue selection edits through BuilderTools so `/undo` can revert the optimization.
@@ -21,23 +41,27 @@ The optimizer keeps visible surfaces, entities, fluids, tints, and block compone
 
 - Hytale server build `2026.03.26-89796e57b`.
 - Java `25`.
-- Maven.
+- Gradle (the wrapper is included, so you don't need a system install — you can use `./gradlew`).
 - Creative-mode permission for the commands.
 
 The mod depends on Hytale's provided `com.hypixel.hytale:Server` artifact and includes its UI assets in the mod jar.
 
 ## Installation
 
-1. Build the mod:
+1. Build the mod using the included Gradle wrapper:
 
    ```bash
-   mvn clean install
+   # Unix / macOS / Git Bash
+   ./gradlew build
+
+   # Windows cmd / PowerShell
+   gradlew.bat build
    ```
 
 2. Use the generated jar:
 
    ```text
-   target/PrefabOptimizer-0.1.0.jar
+   build/libs/PrefabOptimizer-Extended-0.2.0-SNAPSHOT.jar
    ```
 
 3. Install or load the jar in your Hytale server mods environment.
@@ -50,6 +74,8 @@ The mod depends on Hytale's provided `com.hypixel.hytale:Server` artifact and in
 | `/prefaboptimizer prefabs` | `/prefaboptimizer prefab`, `/prefaboptimizer batch` | Opens the prefab batch optimizer GUI. |
 | `/prefaboptimizer selection` | `/prefaboptimizer sel` | Opens the selection optimizer GUI if the player has a BuilderTools selection. |
 
+Commands are intentionally unchanged from the original so that existing muscle memory keeps working.
+
 ## Selection Optimizer
 
 Use this when you want to optimize blocks already placed in a world or prefab editor selection.
@@ -59,7 +85,7 @@ Use this when you want to optimize blocks already placed in a world or prefab ed
 3. Choose optimizer settings.
 4. Click `Optimize Selection`.
 5. The GUI closes and a chat notification confirms that optimization is in process.
-6. When it finishes, PrefabOptimizer reports the number and percentage of blocks removed.
+6. When it finishes, PrefabOptimizer-Extended reports the number and percentage of blocks removed.
 7. Use `/undo` if you need to revert the edit.
 
 The selection optimizer checks the current BuilderTools selection, counts hidden removable blocks, and uses BuilderTools' replace operation with a custom mask. This keeps the change compatible with BuilderTools history.
@@ -77,7 +103,7 @@ Use this when you want to generate optimized copies of prefab files.
 7. Choose optimizer settings.
 8. Click `Optimize Prefab Batch`.
 9. The GUI closes and a chat notification confirms that optimization is in process.
-10. When it finishes, PrefabOptimizer reports the number and percentage of blocks removed.
+10. When it finishes, PrefabOptimizer-Extended reports the number and percentage of blocks removed.
 
 The batch optimizer saves optimized copies into the target mod. It does not overwrite source prefabs unless you deliberately choose the same target pack/folder path.
 
@@ -126,12 +152,12 @@ A block is removable only when all of the following are true:
 - All six direct neighbors are inside the selected/prefab bounds.
 - All six direct neighbors are also optimizable full-cube blocks.
 
-This intentionally conservative first mode avoids removing exposed or structurally important visible blocks.
+This intentionally conservative default mode avoids removing exposed or structurally important visible blocks. The Extended fork keeps this as the default and adds opt-in modes for more aggressive removal.
 
 ## Project Structure
 
 ```text
-src/main/java/dev/ninesliced/prefaboptimizer
+src/main/java/dev/lewai/prefaboptimizerextended
 |-- commands
 |   |-- PrefabOptimizerCommand.java
 |   |-- CommandPages.java
@@ -163,26 +189,30 @@ src/main/resources/Common/UI/Custom/Pages/PrefabOptimizer
 Compile without running tests:
 
 ```bash
-mvn -DskipTests compile
+./gradlew compileJava
 ```
 
-Build and install locally:
+Build a jar:
 
 ```bash
-mvn clean install
+./gradlew build
 ```
 
-Check source deprecation warnings:
+Show deprecation and other compiler warnings:
 
 ```bash
-mvn -DskipTests -Dmaven.compiler.showDeprecation=true -Dmaven.compiler.showWarnings=true clean compile
+./gradlew compileJava -Pcompiler.showDeprecation=true -Pcompiler.showWarnings=true
 ```
 
-The Maven startup warning about `sun.misc.Unsafe` comes from Maven/Guava on the current toolchain, not from PrefabOptimizer source code.
+Clean:
+
+```bash
+./gradlew clean
+```
 
 ## Compatibility Notes
 
-Some BuilderTools APIs differ across Hytale builds. PrefabOptimizer uses small compatibility shims for:
+Some BuilderTools APIs differ across Hytale builds. PrefabOptimizer-Extended inherits the original compatibility shims for:
 
 - BuilderTools selection permission checks whose player parameter type differs between builds.
 - Selection bounds whose vector type may differ between compile-time and runtime APIs.
@@ -192,14 +222,21 @@ These shims are intentionally narrow and isolated in the optimization layer.
 
 ## Known Limitations
 
-- The current optimization mode is conservative and only removes blocks fully enclosed on all six direct faces.
+- The default optimization mode is conservative and only removes blocks fully enclosed on all six direct faces.
 - Batch prefab optimization is not undoable through `/undo`; it writes optimized prefab copies to a target mod.
 - Selection optimization is undoable because it goes through BuilderTools history.
 - The target mod list intentionally excludes read-only and Java-backed mods; it only allows writable asset-only mods.
 - Very large prefab batches may still take time, but they are processed on a background executor instead of the UI/world thread.
 
+## Credits
+
+- Original mod: **Theobosse** ([ninesliced.com](https://ninesliced.com)) — creator of PrefabOptimizer. All core algorithms, BuilderTools integration, and UI pages are their work.
+- Extended fork: **lewai1** ([github.com/lewai1](https://github.com/lewai1)) — performance, UX, and additional optimization modes.
+
 ## License
 
-PrefabOptimizer is licensed under the GNU Affero General Public License v3.0, matching Hytale-BetterMap.
+PrefabOptimizer-Extended is licensed under the **GNU Affero General Public License v3.0**, matching the upstream PrefabOptimizer project.
 
-See `LICENSE.md`.
+Because this mod is AGPL, any deployment that exposes it over a network (including running it on a Hytale server reachable by players) must make the corresponding source code available to its users.
+
+See [`LICENSE.md`](./LICENSE.md).
