@@ -8,126 +8,139 @@ $C = "../../Common.ui";
   Sounds: $C.@ButtonSounds
 );
 
-@Panel = #1f2529(0.78);
+@Panel = #1a1a2e(0.86);
 @Line = #8f7f45(0.40);
 @Gold = #c8b56f;
+@Title = #bfcdd5;
 @SoftText = #d8d0b4;
+@Hint = #96a9be;
 
-$C.@PageOverlay {
-  $C.@DecoratedContainer {
-    Anchor: (Width: 560, Height: 420);
+$C.@PageOverlay {}
 
-    #Title {
-      $C.@Title {
-        @Text = "Selection Optimizer";
-      }
-      TextButton #CloseButton {
-        Anchor: (Left: 12, Top: 4, Width: 64, Height: 24);
-        Padding: (Left: 8, Top: 2);
-        Text: "Close";
-        Style: TextButtonStyle(
-          Default: (LabelStyle: (FontSize: 14, TextColor: #93844c, RenderBold: true)),
-          Sounds: $C.@ButtonSounds
-        );
-        Background: #000000(0.13);
-      }
+Group #SelectionOptimizerRoot {
+  Anchor: (Top: 0, Right: 0, Bottom: 0, Width: 460);
+  Background: @Panel;
+  LayoutMode: Top;
+  Padding: (Full: 16);
+
+  Group #Header {
+    LayoutMode: Left;
+    Anchor: (Height: 34);
+    Padding: (Bottom: 10);
+
+    Label #Title {
+      Text: "SELECTION OPTIMIZER";
+      Style: (FontSize: 18, TextColor: @Title, RenderBold: true, RenderUppercase: true);
+      FlexWeight: 1;
     }
 
-    #Content {
-      LayoutMode: Top;
-      Padding: (Full: 18);
-
-      Group #Body {
-        LayoutMode: TopScrolling;
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
-        FlexWeight: 1;
-        Padding: (Full: 14);
-        Background: @Panel;
-
-        Label {
-          Text: "Optimizes your current BuilderTools selection. The edit is queued through BuilderTools, so /undo can revert it.";
-          Style: (FontSize: 14, TextColor: @SoftText);
-          Anchor: (Height: 48);
-        }
-
-        Panel { Anchor: (Height: 1); Background: @Line; }
-        Panel { Anchor: (Height: 14); Background: #000000(0); }
-
-        Label {
-          Text: "Optimizer Settings";
-          Style: (FontSize: 17, TextColor: @Gold, RenderBold: true);
-          Anchor: (Height: 28);
-        }
-
-        Group { LayoutMode: Left; Anchor: (Height: 32);
-          $C.@CheckBox #PreserveTransparent { Anchor: (Width: 28, Height: 28); Value: true; }
-          Label { Text: "Preserve transparent / non-opaque blocks"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; }
-        }
-
-        Group { LayoutMode: Left; Anchor: (Height: 32);
-          $C.@CheckBox #StrictCubeOnly { Anchor: (Width: 28, Height: 28); Value: true; }
-          Label { Text: "Default mode: only remove DrawType.Cube blocks"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; }
-        }
-
-        Group { LayoutMode: Left; Anchor: (Height: 32);
-          $C.@CheckBox #PreserveFluidAdjacent { Anchor: (Width: 28, Height: 28); Value: true; }
-          Label { Text: "Preserve blocks next to water / lava (recommended to avoid fluids leaking)"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; }
-        }
-
-        Group { LayoutMode: Left; Anchor: (Height: 32);
-          $C.@CheckBox #FloodFillInterior { Anchor: (Width: 28, Height: 28); Value: false; }
-          Label { Text: "Flood-fill interior mode (remove anything unreachable from outside, more aggressive)"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; }
-        }
-
-        Group { LayoutMode: Left; Anchor: (Height: 32);
-          Label { Text: "Shell thickness (flood-fill): keep N layers from visible faces"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; }
-          $C.@TextField #ShellThickness { Anchor: (Width: 60, Height: 28); PlaceholderText: "1"; }
-        }
-
-        Group { LayoutMode: Left; Anchor: (Height: 32);
-          $C.@CheckBox #SkipBottomFace { Anchor: (Width: 28, Height: 28); Value: false; }
-          Label { Text: "Skip bottom face (treat the prefab's bottom as sitting on ground)"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; }
-        }
-
-        Group { LayoutMode: Left; Anchor: (Height: 32);
-          $C.@CheckBox #PreviewOnly { Anchor: (Width: 28, Height: 28); Value: false; }
-          Label { Text: "Preview only (report what would be removed, do not modify the world)"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; }
-        }
-
-        Label {
-          Text: "Exclude blocks by regex, or comma-separated text tokens";
-          Style: (FontSize: 12, TextColor: #9ab2bc);
-          Anchor: (Height: 22, Top: 8);
-        }
-
-        $C.@TextField #ExcludedBlocks {
-          Anchor: (Height: 36);
-          PlaceholderText: "Example: ^UnstableRifts_|Glass|Water";
-          PlaceholderStyle: (TextColor: #586971, FontSize: 12);
-        }
-
-        Group { LayoutMode: Left; Anchor: (Height: 32, Top: 4);
-          TextButton #AddFluidsButton { FlexWeight: 1; Anchor: (Height: 28); Text: "+ Fluids"; Style: @PrimaryButton; }
-          Panel { Anchor: (Width: 6, Height: 1); }
-          TextButton #AddDecorButton { FlexWeight: 1; Anchor: (Height: 28); Text: "+ Decor"; Style: @PrimaryButton; }
-          Panel { Anchor: (Width: 6, Height: 1); }
-          TextButton #ClearExcludedButton { FlexWeight: 1; Anchor: (Height: 28); Text: "Clear"; Style: @PrimaryButton; }
-        }
-
-        Panel { Anchor: (Height: 18); Background: #000000(0); }
-
-        TextButton #OptimizeSelectionButton {
-          Anchor: (Height: 36);
-          Text: "Optimize Selection";
-          Style: @PrimaryButton;
-        }
-      }
-
-      Label #StatusLabel {
-        Text: "";
-        Style: (FontSize: 12, TextColor: #9ab2bc);
-        Anchor: (Height: 32, Top: 8);
-      }
+    TextButton #CloseButton {
+      Anchor: (Width: 70, Height: 28);
+      Text: "Close";
+      Style: TextButtonStyle(
+        Default: (LabelStyle: (FontSize: 13, TextColor: #93844c, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center)),
+        Hovered: (LabelStyle: (FontSize: 13, TextColor: #c8b56f, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center)),
+        Sounds: $C.@ButtonSounds
+      );
+      Background: #000000(0.18);
     }
+  }
+
+  Label {
+    Text: "Optimizes your current BuilderTools selection. The edit goes through BuilderTools history, so /undo can revert it.";
+    Style: (FontSize: 12, TextColor: @Hint);
+    Anchor: (Height: 42);
+  }
+
+  Panel { Anchor: (Height: 1); Background: @Line; }
+  Panel { Anchor: (Height: 10); Background: #000000(0); }
+
+  Label {
+    Text: "OPTIMIZER SETTINGS";
+    Style: (FontSize: 12, TextColor: @Title, RenderBold: true, RenderUppercase: true);
+    Anchor: (Height: 20);
+    Padding: (Bottom: 6);
+  }
+
+  Group { LayoutMode: Left; Anchor: (Height: 28);
+    $C.@CheckBox #PreserveTransparent { Anchor: (Width: 26, Height: 26); Value: true; }
+    Label { Text: "Preserve transparent / non-opaque blocks"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; Padding: (Left: 8); }
+  }
+
+  Group { LayoutMode: Left; Anchor: (Height: 28);
+    $C.@CheckBox #StrictCubeOnly { Anchor: (Width: 26, Height: 26); Value: true; }
+    Label { Text: "Only remove DrawType.Cube blocks"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; Padding: (Left: 8); }
+  }
+
+  Group { LayoutMode: Left; Anchor: (Height: 28);
+    $C.@CheckBox #PreserveFluidAdjacent { Anchor: (Width: 26, Height: 26); Value: true; }
+    Label { Text: "Preserve blocks next to water / lava"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; Padding: (Left: 8); }
+  }
+
+  Group { LayoutMode: Left; Anchor: (Height: 28);
+    $C.@CheckBox #FloodFillInterior { Anchor: (Width: 26, Height: 26); Value: false; }
+    Label { Text: "Flood-fill interior mode (aggressive)"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; Padding: (Left: 8); }
+  }
+
+  Group { LayoutMode: Left; Anchor: (Height: 30);
+    Label { Text: "Shell thickness (layers to keep)"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; }
+    $C.@TextField #ShellThickness { Anchor: (Width: 60, Height: 26); PlaceholderText: "1"; }
+  }
+
+  Group { LayoutMode: Left; Anchor: (Height: 28);
+    $C.@CheckBox #SkipBottomFace { Anchor: (Width: 26, Height: 26); Value: false; }
+    Label { Text: "Skip bottom face (sits on ground)"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; Padding: (Left: 8); }
+  }
+
+  Group { LayoutMode: Left; Anchor: (Height: 28);
+    $C.@CheckBox #PreviewOnly { Anchor: (Width: 26, Height: 26); Value: false; }
+    Label { Text: "Preview only (don't modify the world)"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; Padding: (Left: 8); }
+  }
+
+  Panel { Anchor: (Height: 10); Background: #000000(0); }
+  Panel { Anchor: (Height: 1); Background: @Line; }
+  Panel { Anchor: (Height: 10); Background: #000000(0); }
+
+  Label {
+    Text: "EXCLUDED BLOCKS";
+    Style: (FontSize: 12, TextColor: @Title, RenderBold: true, RenderUppercase: true);
+    Anchor: (Height: 20);
+    Padding: (Bottom: 4);
+  }
+
+  Label {
+    Text: "Regex, or comma-separated tokens";
+    Style: (FontSize: 11, TextColor: @Hint);
+    Anchor: (Height: 18);
+    Padding: (Bottom: 2);
+  }
+
+  $C.@TextField #ExcludedBlocks {
+    Anchor: (Height: 32);
+    PlaceholderText: "Example: ^UnstableRifts_|Glass|Water";
+    PlaceholderStyle: (TextColor: #586971, FontSize: 12);
+  }
+
+  Group { LayoutMode: Left; Anchor: (Height: 30, Top: 6);
+    TextButton #AddFluidsButton { FlexWeight: 1; Anchor: (Height: 26); Text: "+ Fluids"; Style: @PrimaryButton; }
+    Panel { Anchor: (Width: 6, Height: 1); }
+    TextButton #AddDecorButton { FlexWeight: 1; Anchor: (Height: 26); Text: "+ Decor"; Style: @PrimaryButton; }
+    Panel { Anchor: (Width: 6, Height: 1); }
+    TextButton #ClearExcludedButton { FlexWeight: 1; Anchor: (Height: 26); Text: "Clear"; Style: @PrimaryButton; }
+  }
+
+  Panel { FlexWeight: 1; Background: #000000(0); }
+
+  Label #StatusLabel {
+    Text: "";
+    Style: (FontSize: 12, TextColor: @Hint);
+    Anchor: (Height: 36);
+    Padding: (Bottom: 6);
+  }
+
+  TextButton #OptimizeSelectionButton {
+    Anchor: (Height: 40);
+    Text: "Optimize Selection";
+    Style: @PrimaryButton;
   }
 }

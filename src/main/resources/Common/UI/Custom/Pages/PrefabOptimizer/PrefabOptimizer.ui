@@ -8,246 +8,298 @@ $C = "../../Common.ui";
   Sounds: $C.@ButtonSounds
 );
 
-@Panel = #1f2529(0.74);
+@Panel = #1a1a2e(0.86);
+@Card = #1f2529(0.74);
 @Line = #8f7f45(0.40);
 @Gold = #c8b56f;
+@Title = #bfcdd5;
 @SoftText = #d8d0b4;
+@Hint = #96a9be;
 
-$C.@PageOverlay {
-  $C.@DecoratedContainer {
-    Anchor: (Width: 880, Height: 700);
+$C.@PageOverlay {}
 
-    #Title {
-      $C.@Title {
-        @Text = "Prefab Optimizer";
+Group #PrefabOptimizerRoot {
+  Anchor: (Full: 0);
+  Background: @Panel;
+  LayoutMode: Top;
+  Padding: (Full: 14);
+
+  Group #Header {
+    LayoutMode: Left;
+    Anchor: (Height: 36);
+    Padding: (Bottom: 8);
+
+    Label #Title {
+      Text: "PREFAB OPTIMIZER";
+      Style: (FontSize: 20, TextColor: @Title, RenderBold: true, RenderUppercase: true);
+      FlexWeight: 1;
+    }
+
+    TextButton #CloseButton {
+      Anchor: (Width: 80, Height: 30);
+      Text: "Close";
+      Style: TextButtonStyle(
+        Default: (LabelStyle: (FontSize: 13, TextColor: #93844c, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center)),
+        Hovered: (LabelStyle: (FontSize: 13, TextColor: #c8b56f, RenderBold: true, HorizontalAlignment: Center, VerticalAlignment: Center)),
+        Sounds: $C.@ButtonSounds
+      );
+      Background: #000000(0.18);
+    }
+  }
+
+  Label {
+    Text: "Select prefab files or folders, choose a writable asset-only mod, and save optimized copies into the target folder.";
+    Style: (FontSize: 12, TextColor: @Hint);
+    Anchor: (Height: 24);
+    Padding: (Bottom: 6);
+  }
+
+  Group #MainColumns {
+    LayoutMode: Left;
+    FlexWeight: 1;
+
+    // ---------------------------------------------------------------
+    // COLUMN 1 - Prefab Browser
+    // ---------------------------------------------------------------
+    Group #SourcePanel {
+      FlexWeight: 1;
+      LayoutMode: Top;
+      Padding: (Full: 10);
+      Background: @Card;
+
+      Label {
+        Text: "PREFAB BROWSER";
+        Style: (FontSize: 13, TextColor: @Gold, RenderBold: true, RenderUppercase: true);
+        Anchor: (Height: 22);
+        Padding: (Bottom: 4);
       }
-      TextButton #CloseButton {
-        Anchor: (Left: 12, Top: 4, Width: 64, Height: 24);
-        Padding: (Left: 8, Top: 2);
-        Text: "Close";
-        Style: TextButtonStyle(
-          Default: (LabelStyle: (FontSize: 14, TextColor: #93844c, RenderBold: true)),
-          Sounds: $C.@ButtonSounds
-        );
-        Background: #000000(0.13);
+
+      Label #CurrentPath {
+        Text: "Assets";
+        Style: (FontSize: 11, TextColor: @Hint);
+        Anchor: (Height: 18);
+        Padding: (Bottom: 4);
+      }
+
+      $C.@TextField #SearchInput {
+        Anchor: (Height: 30);
+        PlaceholderText: "Search prefabs...";
+        PlaceholderStyle: (TextColor: #586971, FontSize: 12);
+      }
+
+      Panel { Anchor: (Height: 8); Background: #000000(0); }
+
+      Group #FileList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        Padding: (Top: 4, Right: 6);
+      }
+
+      Panel { Anchor: (Height: 8); Background: #000000(0); }
+
+      Group #SourceActions {
+        LayoutMode: Left;
+        Anchor: (Height: 32);
+
+        TextButton #AddFolderButton {
+          FlexWeight: 1;
+          Anchor: (Height: 30);
+          Text: "Add Current Folder";
+          Style: @PrimaryButton;
+        }
+        Panel { Anchor: (Width: 6, Height: 1); }
+        TextButton #ClearSourcesButton {
+          Anchor: (Width: 90, Height: 30);
+          Text: "Clear";
+          Style: @PrimaryButton;
+        }
+      }
+
+      Group #RecursiveFoldersRow {
+        LayoutMode: Left;
+        Anchor: (Height: 26, Top: 4);
+
+        $C.@CheckBox #RecursiveFolders { Anchor: (Width: 24, Height: 24); Value: true; }
+        Label {
+          Text: "Search folders recursively";
+          Style: (FontSize: 12, TextColor: @SoftText);
+          FlexWeight: 1;
+          Padding: (Left: 6);
+        }
       }
     }
 
-    #Content {
+    Panel { Anchor: (Width: 10, Height: 1); Background: #000000(0); }
+
+    // ---------------------------------------------------------------
+    // COLUMN 2 - Selected sources + Target + Optimize
+    // ---------------------------------------------------------------
+    Group #SourcesAndTargetPanel {
+      Anchor: (Width: 320);
       LayoutMode: Top;
-      Padding: (Full: 14);
+      Padding: (Full: 10);
+      Background: @Card;
+
+      Group #SelectedHeader {
+        LayoutMode: Left;
+        Anchor: (Height: 22);
+        Padding: (Bottom: 4);
+        Label { Text: "SELECTED SOURCES"; Style: (FontSize: 13, TextColor: @Gold, RenderBold: true, RenderUppercase: true); FlexWeight: 1; }
+        Label #SelectedCount { Text: "0 selected"; Style: (FontSize: 11, TextColor: @Hint); Anchor: (Width: 100); }
+      }
+
+      Group #SelectedSourceList {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        Padding: (Right: 6);
+        Background: #0a0e10(0.45);
+      }
+
+      Panel { Anchor: (Height: 10); Background: #000000(0); }
+      Panel { Anchor: (Height: 1); Background: @Line; }
+      Panel { Anchor: (Height: 10); Background: #000000(0); }
 
       Label {
-        Text: "Select prefab files or folders, choose a writable asset-only mod, and recreate optimized copies in the target folder.";
-        Style: (FontSize: 14, TextColor: @SoftText);
+        Text: "TARGET MOD";
+        Style: (FontSize: 12, TextColor: @Title, RenderBold: true, RenderUppercase: true);
+        Anchor: (Height: 20);
+        Padding: (Bottom: 2);
+      }
+      $C.@DropdownBox #TargetPack {
         Anchor: (Height: 30);
       }
 
-      Group #MainColumns {
-        LayoutMode: Left;
-        FlexWeight: 1;
-
-        Group #SourcePanel {
-          LayoutMode: Top;
-          FlexWeight: 1;
-          Padding: (Full: 10);
-          Background: @Panel;
-
-          Label {
-            Text: "Prefab Browser";
-            Style: (FontSize: 17, TextColor: @Gold, RenderBold: true);
-            Anchor: (Height: 26);
-          }
-
-          Label #CurrentPath {
-            Text: "Assets";
-            Style: (FontSize: 12, TextColor: #9ab2bc);
-            Anchor: (Height: 22);
-          }
-
-          $C.@TextField #SearchInput {
-            Anchor: (Height: 34);
-            PlaceholderText: "Search prefabs...";
-            PlaceholderStyle: (TextColor: #586971, FontSize: 13);
-          }
-
-          Group #FileList {
-            FlexWeight: 1;
-            LayoutMode: TopScrolling;
-            ScrollbarStyle: $C.@DefaultScrollbarStyle;
-            Padding: (Top: 8, Right: 8);
-          }
-
-          Group #SourceActions {
-            LayoutMode: Left;
-            Anchor: (Height: 38, Top: 8);
-
-            TextButton #AddFolderButton {
-              FlexWeight: 1;
-              Anchor: (Height: 32);
-              Text: "Add Current Folder";
-              Style: @PrimaryButton;
-            }
-
-            Panel { Anchor: (Width: 8, Height: 1); }
-
-            TextButton #ClearSourcesButton {
-              Anchor: (Width: 110, Height: 32);
-              Text: "Clear";
-              Style: @PrimaryButton;
-            }
-          }
-
-          Group #RecursiveFoldersRow {
-            LayoutMode: Left;
-            Anchor: (Height: 28, Top: 4);
-
-            $C.@CheckBox #RecursiveFolders {
-              Anchor: (Width: 28, Height: 28);
-              Value: true;
-            }
-
-            Label {
-              Text: "Search selected folders recursively";
-              Style: (FontSize: 12, TextColor: @SoftText);
-              FlexWeight: 1;
-            }
-          }
-        }
-
-        Panel { Anchor: (Width: 12, Height: 1); }
-
-        Group #OptionsPanel {
-          LayoutMode: TopScrolling;
-          ScrollbarStyle: $C.@DefaultScrollbarStyle;
-          Anchor: (Width: 380);
-          Padding: (Full: 10);
-          Background: @Panel;
-
-          Label {
-            Text: "Optimizer Settings";
-            Style: (FontSize: 17, TextColor: @Gold, RenderBold: true);
-            Anchor: (Height: 26);
-          }
-
-          Group { LayoutMode: Left; Anchor: (Height: 28);
-            $C.@CheckBox #PreserveTransparent { Anchor: (Width: 28, Height: 28); Value: true; }
-            Label { Text: "Preserve transparent / non-opaque blocks"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
-          }
-
-          Group { LayoutMode: Left; Anchor: (Height: 28);
-            $C.@CheckBox #StrictCubeOnly { Anchor: (Width: 28, Height: 28); Value: true; }
-            Label { Text: "Default mode: only remove DrawType.Cube blocks"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
-          }
-
-          Group { LayoutMode: Left; Anchor: (Height: 28);
-            $C.@CheckBox #PreserveFluidAdjacent { Anchor: (Width: 28, Height: 28); Value: true; }
-            Label { Text: "Preserve blocks next to water / lava (recommended to avoid fluids leaking)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
-          }
-
-          Group { LayoutMode: Left; Anchor: (Height: 28);
-            $C.@CheckBox #FloodFillInterior { Anchor: (Width: 28, Height: 28); Value: false; }
-            Label { Text: "Flood-fill interior mode (remove anything unreachable from outside, more aggressive)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
-          }
-
-          Group { LayoutMode: Left; Anchor: (Height: 28);
-            Label { Text: "Shell thickness (flood-fill): keep N layers"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
-            $C.@TextField #ShellThickness { Anchor: (Width: 50, Height: 26); PlaceholderText: "1"; }
-          }
-
-          Group { LayoutMode: Left; Anchor: (Height: 28);
-            $C.@CheckBox #SkipBottomFace { Anchor: (Width: 28, Height: 28); Value: false; }
-            Label { Text: "Skip bottom face (prefab sits on the ground)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
-          }
-
-          Group { LayoutMode: Left; Anchor: (Height: 28);
-            $C.@CheckBox #PreviewOnly { Anchor: (Width: 28, Height: 28); Value: false; }
-            Label { Text: "Preview only (no files written, report only)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
-          }
-
-          Label {
-            Text: "Exclude blocks by regex, or comma-separated text tokens";
-            Style: (FontSize: 12, TextColor: #9ab2bc);
-            Anchor: (Height: 20, Top: 4);
-          }
-
-          $C.@TextField #ExcludedBlocks {
-            Anchor: (Height: 34);
-            PlaceholderText: "Example: ^UnstableRifts_|Glass|Water";
-            PlaceholderStyle: (TextColor: #586971, FontSize: 12);
-          }
-
-          Group { LayoutMode: Left; Anchor: (Height: 30, Top: 4);
-            TextButton #AddFluidsButton { FlexWeight: 1; Anchor: (Height: 26); Text: "+ Fluids"; Style: @PrimaryButton; }
-            Panel { Anchor: (Width: 6, Height: 1); }
-            TextButton #AddDecorButton { FlexWeight: 1; Anchor: (Height: 26); Text: "+ Decor"; Style: @PrimaryButton; }
-            Panel { Anchor: (Width: 6, Height: 1); }
-            TextButton #ClearExcludedButton { FlexWeight: 1; Anchor: (Height: 26); Text: "Clear"; Style: @PrimaryButton; }
-          }
-
-          Label {
-            Text: "Browse blocks (click to add exact ID to exclusion)";
-            Style: (FontSize: 12, TextColor: #9ab2bc);
-            Anchor: (Height: 20, Top: 6);
-          }
-
-          $C.@TextField #BlockSearchInput {
-            Anchor: (Height: 30);
-            PlaceholderText: "Type to filter...";
-            PlaceholderStyle: (TextColor: #586971, FontSize: 12);
-          }
-
-          Group #BlockSuggestions {
-            Anchor: (Height: 110);
-            LayoutMode: TopScrolling;
-            ScrollbarStyle: $C.@DefaultScrollbarStyle;
-            Padding: (Right: 8);
-            Background: #0a0e10(0.45);
-          }
-
-          Panel { Anchor: (Height: 12); Background: #000000(0); }
-          Panel { Anchor: (Height: 1); Background: @Line; }
-          Panel { Anchor: (Height: 12); Background: #000000(0); }
-
-          Group #SelectedHeader {
-            LayoutMode: Left;
-            Anchor: (Height: 24);
-            Label { Text: "Selected sources"; Style: (FontSize: 12, TextColor: @SoftText, RenderBold: true); FlexWeight: 1; }
-            Label #SelectedCount { Text: "0 selected"; Style: (FontSize: 12, TextColor: #9ab2bc); Anchor: (Width: 110); }
-          }
-
-          Group #SelectedSourceList {
-            Anchor: (Height: 130);
-            LayoutMode: TopScrolling;
-            ScrollbarStyle: $C.@DefaultScrollbarStyle;
-            Padding: (Right: 8);
-            Background: #0a0e10(0.45);
-          }
-
-          Label { Text: "Target mod"; Style: (FontSize: 12, TextColor: @SoftText, RenderBold: true); Anchor: (Height: 20, Top: 8); }
-          $C.@DropdownBox #TargetPack {
-            Anchor: (Height: 30);
-          }
-
-          Label { Text: "Target folder inside Server/Prefabs"; Style: (FontSize: 12, TextColor: @SoftText, RenderBold: true); Anchor: (Height: 20, Top: 8); }
-          $C.@TextField #TargetFolder {
-            Anchor: (Height: 34);
-            PlaceholderText: "Optimized";
-            PlaceholderStyle: (TextColor: #586971, FontSize: 12);
-          }
-
-          TextButton #OptimizePrefabsButton {
-            Anchor: (Height: 34, Top: 10);
-            Text: "Optimize Prefab Batch";
-            Style: @PrimaryButton;
-          }
-        }
+      Label {
+        Text: "TARGET FOLDER (inside Server/Prefabs)";
+        Style: (FontSize: 12, TextColor: @Title, RenderBold: true, RenderUppercase: true);
+        Anchor: (Height: 20, Top: 8);
+        Padding: (Bottom: 2);
       }
+      $C.@TextField #TargetFolder {
+        Anchor: (Height: 30);
+        PlaceholderText: "Optimized";
+        PlaceholderStyle: (TextColor: #586971, FontSize: 12);
+      }
+
+      Panel { Anchor: (Height: 12); Background: #000000(0); }
 
       Label #StatusLabel {
         Text: "";
-        Style: (FontSize: 12, TextColor: #9ab2bc);
-        Anchor: (Height: 32, Top: 8);
+        Style: (FontSize: 11, TextColor: @Hint);
+        Anchor: (Height: 32);
+        Padding: (Bottom: 6);
+      }
+
+      TextButton #OptimizePrefabsButton {
+        Anchor: (Height: 40);
+        Text: "Optimize Prefab Batch";
+        Style: @PrimaryButton;
+      }
+    }
+
+    Panel { Anchor: (Width: 10, Height: 1); Background: #000000(0); }
+
+    // ---------------------------------------------------------------
+    // COLUMN 3 - Settings + Exclusions + Block browser
+    // ---------------------------------------------------------------
+    Group #OptionsPanel {
+      Anchor: (Width: 360);
+      LayoutMode: Top;
+      Padding: (Full: 10);
+      Background: @Card;
+
+      Label {
+        Text: "OPTIMIZER SETTINGS";
+        Style: (FontSize: 13, TextColor: @Gold, RenderBold: true, RenderUppercase: true);
+        Anchor: (Height: 22);
+        Padding: (Bottom: 4);
+      }
+
+      Group { LayoutMode: Left; Anchor: (Height: 26);
+        $C.@CheckBox #PreserveTransparent { Anchor: (Width: 24, Height: 24); Value: true; }
+        Label { Text: "Preserve transparent blocks"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; Padding: (Left: 6); }
+      }
+      Group { LayoutMode: Left; Anchor: (Height: 26);
+        $C.@CheckBox #StrictCubeOnly { Anchor: (Width: 24, Height: 24); Value: true; }
+        Label { Text: "Only remove DrawType.Cube"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; Padding: (Left: 6); }
+      }
+      Group { LayoutMode: Left; Anchor: (Height: 26);
+        $C.@CheckBox #PreserveFluidAdjacent { Anchor: (Width: 24, Height: 24); Value: true; }
+        Label { Text: "Preserve blocks next to water / lava"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; Padding: (Left: 6); }
+      }
+      Group { LayoutMode: Left; Anchor: (Height: 26);
+        $C.@CheckBox #FloodFillInterior { Anchor: (Width: 24, Height: 24); Value: false; }
+        Label { Text: "Flood-fill interior (aggressive)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; Padding: (Left: 6); }
+      }
+      Group { LayoutMode: Left; Anchor: (Height: 28);
+        Label { Text: "Shell thickness (layers to keep)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
+        $C.@TextField #ShellThickness { Anchor: (Width: 54, Height: 24); PlaceholderText: "1"; }
+      }
+      Group { LayoutMode: Left; Anchor: (Height: 26);
+        $C.@CheckBox #SkipBottomFace { Anchor: (Width: 24, Height: 24); Value: false; }
+        Label { Text: "Skip bottom face (sits on ground)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; Padding: (Left: 6); }
+      }
+      Group { LayoutMode: Left; Anchor: (Height: 26);
+        $C.@CheckBox #PreviewOnly { Anchor: (Width: 24, Height: 24); Value: false; }
+        Label { Text: "Preview only (no files written)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; Padding: (Left: 6); }
+      }
+
+      Panel { Anchor: (Height: 8); Background: #000000(0); }
+      Panel { Anchor: (Height: 1); Background: @Line; }
+      Panel { Anchor: (Height: 8); Background: #000000(0); }
+
+      Label {
+        Text: "EXCLUDED BLOCKS";
+        Style: (FontSize: 12, TextColor: @Gold, RenderBold: true, RenderUppercase: true);
+        Anchor: (Height: 20);
+        Padding: (Bottom: 2);
+      }
+      Label {
+        Text: "Regex, or comma-separated tokens";
+        Style: (FontSize: 11, TextColor: @Hint);
+        Anchor: (Height: 16);
+        Padding: (Bottom: 2);
+      }
+      $C.@TextField #ExcludedBlocks {
+        Anchor: (Height: 30);
+        PlaceholderText: "Example: ^UnstableRifts_|Glass|Water";
+        PlaceholderStyle: (TextColor: #586971, FontSize: 12);
+      }
+      Group { LayoutMode: Left; Anchor: (Height: 28, Top: 6);
+        TextButton #AddFluidsButton { FlexWeight: 1; Anchor: (Height: 24); Text: "+ Fluids"; Style: @PrimaryButton; }
+        Panel { Anchor: (Width: 4, Height: 1); }
+        TextButton #AddDecorButton { FlexWeight: 1; Anchor: (Height: 24); Text: "+ Decor"; Style: @PrimaryButton; }
+        Panel { Anchor: (Width: 4, Height: 1); }
+        TextButton #ClearExcludedButton { FlexWeight: 1; Anchor: (Height: 24); Text: "Clear"; Style: @PrimaryButton; }
+      }
+
+      Panel { Anchor: (Height: 10); Background: #000000(0); }
+
+      Label {
+        Text: "BROWSE BLOCKS";
+        Style: (FontSize: 12, TextColor: @Gold, RenderBold: true, RenderUppercase: true);
+        Anchor: (Height: 20);
+        Padding: (Bottom: 2);
+      }
+      Label {
+        Text: "Click a suggestion to add its ID to the exclusion";
+        Style: (FontSize: 11, TextColor: @Hint);
+        Anchor: (Height: 16);
+        Padding: (Bottom: 2);
+      }
+      $C.@TextField #BlockSearchInput {
+        Anchor: (Height: 28);
+        PlaceholderText: "Type to filter block IDs...";
+        PlaceholderStyle: (TextColor: #586971, FontSize: 12);
+      }
+      Group #BlockSuggestions {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        Padding: (Top: 4, Right: 6);
+        Background: #0a0e10(0.45);
       }
     }
   }
