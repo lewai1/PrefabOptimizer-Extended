@@ -5,6 +5,8 @@ import com.hypixel.hytale.server.core.prefab.selection.mask.BlockFilter;
 import com.hypixel.hytale.server.core.prefab.selection.mask.BlockMask;
 import com.hypixel.hytale.server.core.universe.world.accessor.BlockAccessor;
 import com.hypixel.hytale.server.core.universe.world.accessor.ChunkAccessor;
+import it.unimi.dsi.fastutil.ints.Int2BooleanMap;
+import it.unimi.dsi.fastutil.ints.Int2BooleanOpenHashMap;
 import javax.annotation.Nonnull;
 
 @SuppressWarnings({"deprecation", "rawtypes", "removal"})
@@ -20,6 +22,7 @@ public final class OccludedBlockMask extends BlockMask {
 
     private final BlockClassifier classifier;
     private final OptimizerSettings settings;
+    private final Int2BooleanMap classifierCache = new Int2BooleanOpenHashMap();
 
     public OccludedBlockMask(@Nonnull BlockClassifier classifier, @Nonnull OptimizerSettings settings) {
         super(BlockFilter.EMPTY_ARRAY);
@@ -62,7 +65,7 @@ public final class OccludedBlockMask extends BlockMask {
         @Nonnull BlockBounds bounds,
         int blockId
     ) {
-        if (!this.classifier.isOptimizableFullCube(blockId, this.settings)) {
+        if (!this.classify(blockId)) {
             return false;
         }
 
@@ -81,11 +84,22 @@ public final class OccludedBlockMask extends BlockMask {
             if (preserveFluidAdjacent && chunk.getFluidId(nx, ny, nz) != 0) {
                 return false;
             }
-            if (!this.classifier.isOptimizableFullCube(chunk.getBlock(nx, ny, nz), this.settings)) {
+            if (!this.classify(chunk.getBlock(nx, ny, nz))) {
                 return false;
             }
         }
         return true;
+    }
+
+    private boolean classify(int blockId) {
+        synchronized (this.classifierCache) {
+            if (this.classifierCache.containsKey(blockId)) {
+                return this.classifierCache.get(blockId);
+            }
+            boolean result = this.classifier.isOptimizableFullCube(blockId, this.settings);
+            this.classifierCache.put(blockId, result);
+            return result;
+        }
     }
 
     private static BlockBounds toBounds(

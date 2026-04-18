@@ -37,6 +37,13 @@ final class SelectionOptimizationService {
             return false;
         }
 
+        if (settings.excludedBlocksRegexError() != null) {
+            playerRef.sendMessage(Message.raw(
+                "PrefabOptimizer-Extended warning: exclusion regex invalid, fell back to token matching: "
+                    + settings.excludedBlocksRegexError()
+            ));
+        }
+
         BuilderToolsPlugin.addToQueue(player, playerRef, (queueRef, state, componentAccessor) -> {
             BlockSelection selection = state.getSelection();
             if (selection == null || !selection.hasSelectionBounds()) {

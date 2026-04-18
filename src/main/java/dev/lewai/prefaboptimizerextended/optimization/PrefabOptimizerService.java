@@ -9,18 +9,26 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
 import javax.annotation.Nonnull;
 
 public final class PrefabOptimizerService {
+    private static final int BATCH_PARALLELISM = Math.max(2, Runtime.getRuntime().availableProcessors() - 1);
+
     private static final BlockClassifier CLASSIFIER = new BlockClassifier();
     private static final AssetPrefabFileProvider SOURCE_PROVIDER = new AssetPrefabFileProvider();
-    private static final ExecutorService PREFAB_BATCH_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
-        Thread thread = new Thread(r, "PrefabOptimizerExt-Batch");
-        thread.setDaemon(true);
-        return thread;
-    });
+    private static final ForkJoinPool PREFAB_BATCH_EXECUTOR = new ForkJoinPool(
+        BATCH_PARALLELISM,
+        pool -> {
+            ForkJoinWorkerThread thread = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
+            thread.setName("PrefabOptimizerExt-Batch-" + thread.getPoolIndex());
+            thread.setDaemon(true);
+            return thread;
+        },
+        null,
+        false
+    );
     private static final PrefabSourceCollector SOURCE_COLLECTOR = new PrefabSourceCollector(SOURCE_PROVIDER);
     private static final SelectionOptimizationService SELECTION_OPTIMIZER = new SelectionOptimizationService(CLASSIFIER);
     private static final PrefabBatchOptimizer PREFAB_BATCH_OPTIMIZER = new PrefabBatchOptimizer(

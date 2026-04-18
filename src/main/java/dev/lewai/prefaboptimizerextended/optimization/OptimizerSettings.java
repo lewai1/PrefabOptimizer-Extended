@@ -18,6 +18,8 @@ public final class OptimizerSettings {
     @Nullable
     private final Pattern excludedBlocksPattern;
     private final List<String> excludedBlockTokens;
+    @Nullable
+    private final String excludedBlocksRegexError;
 
     private OptimizerSettings(
         boolean preserveTransparentBlocks,
@@ -25,7 +27,8 @@ public final class OptimizerSettings {
         boolean preserveFluidAdjacentBlocks,
         @Nonnull String excludedBlocksRaw,
         @Nullable Pattern excludedBlocksPattern,
-        @Nonnull List<String> excludedBlockTokens
+        @Nonnull List<String> excludedBlockTokens,
+        @Nullable String excludedBlocksRegexError
     ) {
         this.preserveTransparentBlocks = preserveTransparentBlocks;
         this.strictCubeOnly = strictCubeOnly;
@@ -33,6 +36,7 @@ public final class OptimizerSettings {
         this.excludedBlocksRaw = excludedBlocksRaw;
         this.excludedBlocksPattern = excludedBlocksPattern;
         this.excludedBlockTokens = List.copyOf(excludedBlockTokens);
+        this.excludedBlocksRegexError = excludedBlocksRegexError;
     }
 
     public static OptimizerSettings create(
@@ -50,7 +54,8 @@ public final class OptimizerSettings {
             preserveFluidAdjacentBlocks == null || preserveFluidAdjacentBlocks,
             raw,
             exclusionRules.pattern(),
-            exclusionRules.tokens()
+            exclusionRules.tokens(),
+            exclusionRules.regexError()
         );
     }
 
@@ -69,6 +74,11 @@ public final class OptimizerSettings {
     @Nonnull
     public String excludedBlocksRaw() {
         return this.excludedBlocksRaw;
+    }
+
+    @Nullable
+    public String excludedBlocksRegexError() {
+        return this.excludedBlocksRegexError;
     }
 
     public boolean excludes(@Nullable String blockId) {
@@ -93,17 +103,17 @@ public final class OptimizerSettings {
     @Nonnull
     private static ExclusionRules parseExclusionRules(@Nonnull String raw) {
         if (raw.isBlank()) {
-            return new ExclusionRules(null, List.of());
+            return new ExclusionRules(null, List.of(), null);
         }
 
         if (TOKEN_SEPARATOR.matcher(raw).find()) {
-            return new ExclusionRules(null, parseTokens(raw));
+            return new ExclusionRules(null, parseTokens(raw), null);
         }
 
         try {
-            return new ExclusionRules(Pattern.compile(raw), List.of());
-        } catch (PatternSyntaxException ignored) {
-            return new ExclusionRules(null, parseTokens(raw));
+            return new ExclusionRules(Pattern.compile(raw), List.of(), null);
+        } catch (PatternSyntaxException e) {
+            return new ExclusionRules(null, parseTokens(raw), e.getDescription());
         }
     }
 
@@ -119,6 +129,6 @@ public final class OptimizerSettings {
         return tokens;
     }
 
-    private record ExclusionRules(@Nullable Pattern pattern, @Nonnull List<String> tokens) {
+    private record ExclusionRules(@Nullable Pattern pattern, @Nonnull List<String> tokens, @Nullable String regexError) {
     }
 }

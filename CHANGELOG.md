@@ -14,6 +14,16 @@ This version forks the original [PrefabOptimizer by Theobosse / ninesliced](http
 
 - **Fluid-adjacent blocks are no longer silently removed.** Upstream 0.1.0 could remove blocks that sit directly next to water or lava voxels, because the six-neighbor check only looked at other blocks and ignored the fluid layer. The result was water/lava appearing to "leak" or vanish from optimized prefabs. A new setting **"Preserve blocks next to water / lava"** (enabled by default) pre-scans fluid positions and refuses to remove any block whose 6-neighbor position contains a fluid. The same check applies to the selection optimizer via a fluid-aware `OccludedBlockMask`.
 
+### Performance
+
+- **O(1) neighbor lookups in prefab batch optimization.** `PrefabBatchOptimizer` now pre-builds a `Long2IntOpenHashMap` of block ids keyed by packed local position and a `LongOpenHashSet` of positions with non-zero filler, so neighbor checks no longer go through `getBlockHolderAtWorldPos` (which re-acquires the selection's read lock six times per block).
+- **Block classification cache.** Both `PrefabBatchOptimizer` and `OccludedBlockMask` now memoize `BlockClassifier.isOptimizableFullCube(blockId, settings)` per optimization run in an `Int2BooleanOpenHashMap`. Each block id is classified once instead of up to seven times (self + six neighbors).
+- **Parallel prefab batch processing.** `PrefabOptimizerService` replaces the single-threaded batch executor with a `ForkJoinPool` sized to `max(2, cores − 1)`. `PrefabBatchOptimizer.optimize` now iterates prefabs via `parallelStream()` inside that pool, with thread-safe accumulators (`AtomicInteger`, `Collections.synchronizedList`) for counters and warnings. Saving to different prefab paths is independent and relies on `PrefabStore.getPrefab`'s existing `ConcurrentMap.computeIfAbsent` cache.
+
+### UX
+
+- **Invalid exclusion regex now surfaces a warning** instead of silently falling back to token matching. `OptimizerSettings` captures the `PatternSyntaxException` description, the batch optimizer adds it to the result's warning list, and the selection optimizer sends it as a chat message before queueing the BuilderTools operation.
+
 ### Changed
 
 - Rebranded artifact: `dev.ninesliced:PrefabOptimizer` → `dev.lewai:PrefabOptimizer-Extended`.
