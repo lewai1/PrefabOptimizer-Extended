@@ -14,7 +14,11 @@ import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -23,8 +27,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 final class PrefabBatchOptimizer {
     private static final int[][] NEIGHBORS = {
@@ -53,7 +59,9 @@ final class PrefabBatchOptimizer {
         @Nonnull AssetPack targetPack,
         @Nonnull String targetFolder,
         @Nonnull OptimizerSettings settings,
-        boolean recursiveFolders
+        boolean recursiveFolders,
+        @Nonnull AtomicBoolean cancelled,
+        @Nonnull BatchProgressListener progressListener
     ) {
         PrefabStore prefabStore = PrefabStore.get();
         PrefabSourceCollection sourceCollection = this.sourceCollector.collect(sourceVirtualPaths, recursiveFolders);
@@ -61,30 +69,59 @@ final class PrefabBatchOptimizer {
         List<String> warnings = Collections.synchronizedList(new ArrayList<>(sourceCollection.warnings()));
         AtomicInteger removedBlocks = new AtomicInteger();
         AtomicInteger processedBlocks = new AtomicInteger();
+        AtomicInteger completed = new AtomicInteger();
 
         if (settings.excludedBlocksRegexError() != null) {
             warnings.add("Exclusion regex invalid, fell back to token matching: " + settings.excludedBlocksRegexError());
         }
+        if (settings.previewOnly()) {
+            warnings.add("Preview mode: no files were written. Uncheck 'Preview only' to apply.");
+        }
 
         Collection<PrefabSource> sources = sourceCollection.sources().values();
+        int total = sources.size();
+        Path baseDir = settings.previewOnly() ? null : prefabStore.getPrefabsPathForPack(targetPack);
+        String batchTimestamp = settings.previewOnly() ? null : PrefabBackupService.newTimestamp();
+        Path backupRoot = (baseDir == null || batchTimestamp == null)
+            ? null
+            : PrefabBackupService.backupRootFor(baseDir, batchTimestamp);
+
+        int reportEvery = Math.max(1, total / 100);
+
         try {
             this.executor.submit(() ->
                 sources.parallelStream().forEach(source -> {
+                    if (cancelled.get() || Thread.currentThread().isInterrupted()) {
+                        return;
+                    }
                     try {
                         BlockSelection original = prefabStore.getPrefab(source.path());
                         OptimizedPrefab optimized = this.optimizePrefab(original, settings);
                         String targetKey = buildTargetKey(targetFolder, source.relativeOutputPath());
-                        prefabStore.savePrefabToPack(targetPack, targetKey, optimized.selection(), true);
+
+                        if (!settings.previewOnly()) {
+                            saveAtomically(prefabStore, targetPack, baseDir, targetKey, optimized.selection(), backupRoot);
+                        }
+
                         savedPaths.add(targetKey);
                         removedBlocks.addAndGet(optimized.removedBlocks());
                         processedBlocks.addAndGet(optimized.processedBlocks());
                     } catch (Exception | LinkageError e) {
                         warnings.add(source.path().getFileName() + ": " + ThrowableMessages.readableMessage(e));
+                    } finally {
+                        int done = completed.incrementAndGet();
+                        if (done == total || done % reportEvery == 0) {
+                            progressListener.onProgress(done, total);
+                        }
                     }
                 })
             ).join();
         } catch (RuntimeException e) {
             warnings.add("Batch execution error: " + ThrowableMessages.readableMessage(ThrowableMessages.rootCause(e)));
+        }
+
+        if (cancelled.get()) {
+            warnings.add("Batch cancelled by user. Partial results above reflect the prefabs that completed before the stop.");
         }
 
         return new PrefabOptimizationResult(
@@ -98,17 +135,63 @@ final class PrefabBatchOptimizer {
     }
 
     @Nonnull
-    CompletableFuture<PrefabOptimizationResult> optimizeAsync(
+    BatchHandle optimizeAsync(
         @Nonnull Collection<String> sourceVirtualPaths,
         @Nonnull AssetPack targetPack,
         @Nonnull String targetFolder,
         @Nonnull OptimizerSettings settings,
-        boolean recursiveFolders
+        boolean recursiveFolders,
+        @Nonnull BatchProgressListener progressListener
     ) {
-        return CompletableFuture.supplyAsync(
-            () -> this.optimize(sourceVirtualPaths, targetPack, targetFolder, settings, recursiveFolders),
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        CompletableFuture<PrefabOptimizationResult> future = CompletableFuture.supplyAsync(
+            () -> this.optimize(sourceVirtualPaths, targetPack, targetFolder, settings, recursiveFolders, cancelled, progressListener),
             this.executor
         );
+        return new BatchHandle(future, cancelled);
+    }
+
+    private static void saveAtomically(
+        @Nonnull PrefabStore prefabStore,
+        @Nonnull AssetPack targetPack,
+        @Nonnull Path baseDir,
+        @Nonnull String targetKey,
+        @Nonnull BlockSelection prefab,
+        @Nullable Path backupRoot
+    ) throws IOException {
+        String tempKey = targetKey + ".tmp." + Long.toHexString(System.nanoTime());
+        prefabStore.savePrefabToPack(targetPack, tempKey, prefab, true);
+
+        Path tempPath = baseDir.resolve(tempKey);
+        Path finalPath = baseDir.resolve(targetKey);
+        Path parent = finalPath.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+
+        if (backupRoot != null) {
+            try {
+                PrefabBackupService.backupIfExists(baseDir, backupRoot, targetKey, finalPath);
+            } catch (IOException e) {
+                try {
+                    Files.deleteIfExists(tempPath);
+                } catch (IOException ignored) {
+                }
+                throw e;
+            }
+        }
+
+        try {
+            Files.move(tempPath, finalPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(tempPath, finalPath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            try {
+                Files.deleteIfExists(tempPath);
+            } catch (IOException ignored) {
+            }
+            throw e;
+        }
     }
 
     @Nonnull
@@ -121,7 +204,7 @@ final class PrefabBatchOptimizer {
             ? collectFluidNeighborhood(original)
             : Set.of();
         Int2BooleanMap classifierCache = new Int2BooleanOpenHashMap();
-        LongSet reachableAir = settings.floodFillInterior()
+        ReachabilityMap reachableAir = settings.floodFillInterior()
             ? this.computeReachableAir(index, settings, classifierCache)
             : null;
 
@@ -152,7 +235,7 @@ final class PrefabBatchOptimizer {
         blockIds.defaultReturnValue(0);
         LongOpenHashSet nonZeroFillers = new LongOpenHashSet();
         selection.forEachBlock((x, y, z, block) -> {
-            long key = packPos(x, y, z);
+            long key = PackedPos.pack(x, y, z);
             if (block.filler() != 0) {
                 nonZeroFillers.add(key);
             } else if (block.blockId() > 0) {
@@ -166,19 +249,19 @@ final class PrefabBatchOptimizer {
     private static Set<Long> collectFluidNeighborhood(@Nonnull BlockSelection selection) {
         Set<Long> positions = new HashSet<>();
         selection.forEachFluid((x, y, z, fluidId, fluidLevel) -> {
-            positions.add(packPos(x, y, z));
-            positions.add(packPos(x + 1, y, z));
-            positions.add(packPos(x - 1, y, z));
-            positions.add(packPos(x, y + 1, z));
-            positions.add(packPos(x, y - 1, z));
-            positions.add(packPos(x, y, z + 1));
-            positions.add(packPos(x, y, z - 1));
+            positions.add(PackedPos.pack(x, y, z));
+            positions.add(PackedPos.pack(x + 1, y, z));
+            positions.add(PackedPos.pack(x - 1, y, z));
+            positions.add(PackedPos.pack(x, y + 1, z));
+            positions.add(PackedPos.pack(x, y - 1, z));
+            positions.add(PackedPos.pack(x, y, z + 1));
+            positions.add(PackedPos.pack(x, y, z - 1));
         });
         return positions;
     }
 
     @Nonnull
-    private LongSet computeReachableAir(
+    private ReachabilityMap computeReachableAir(
         @Nonnull PrefabBlockIndex index,
         @Nonnull OptimizerSettings settings,
         @Nonnull Int2BooleanMap classifierCache
@@ -188,7 +271,7 @@ final class PrefabBatchOptimizer {
         LongIterator keys = index.blockIds().keySet().iterator();
         while (keys.hasNext()) {
             long key = keys.nextLong();
-            int x = unpackX(key), y = unpackY(key), z = unpackZ(key);
+            int x = PackedPos.unpackX(key), y = PackedPos.unpackY(key), z = PackedPos.unpackZ(key);
             if (x < xMin) xMin = x; if (x > xMax) xMax = x;
             if (y < yMin) yMin = y; if (y > yMax) yMax = y;
             if (z < zMin) zMin = z; if (z > zMax) zMax = z;
@@ -196,45 +279,92 @@ final class PrefabBatchOptimizer {
         LongIterator fillers = index.nonZeroFillers().iterator();
         while (fillers.hasNext()) {
             long key = fillers.nextLong();
-            int x = unpackX(key), y = unpackY(key), z = unpackZ(key);
+            int x = PackedPos.unpackX(key), y = PackedPos.unpackY(key), z = PackedPos.unpackZ(key);
             if (x < xMin) xMin = x; if (x > xMax) xMax = x;
             if (y < yMin) yMin = y; if (y > yMax) yMax = y;
             if (z < zMin) zMin = z; if (z > zMax) zMax = z;
         }
         if (xMin > xMax) {
-            return LongSet.of();
+            return ReachabilityMap.empty();
         }
 
         int minX = xMin - 1, maxX = xMax + 1;
-        int minY = yMin - 1, maxY = yMax + 1;
+        int minY = settings.skipBottomFace() ? yMin : yMin - 1;
+        int maxY = yMax + 1;
         int minZ = zMin - 1, maxZ = zMax + 1;
 
-        LongOpenHashSet reached = new LongOpenHashSet();
+        ReachabilityMap reached = new ReachabilityMap(minX, maxX, minY, maxY, minZ, maxZ);
         LongArrayFIFOQueue queue = new LongArrayFIFOQueue();
-        long seed = packPos(minX, minY, minZ);
-        reached.add(seed);
-        queue.enqueue(seed);
+        // Seed at the top-exterior corner so it's always outside the block mass
+        // (important when skipBottomFace tightens minY to yMin where blocks exist).
+        long seed = PackedPos.pack(minX, maxY, minZ);
+        if (reached.add(minX, maxY, minZ)) {
+            queue.enqueue(seed);
+        }
 
         while (!queue.isEmpty()) {
             long key = queue.dequeueLong();
-            int x = unpackX(key), y = unpackY(key), z = unpackZ(key);
+            int x = PackedPos.unpackX(key), y = PackedPos.unpackY(key), z = PackedPos.unpackZ(key);
             for (int[] d : NEIGHBORS) {
                 int nx = x + d[0], ny = y + d[1], nz = z + d[2];
                 if (nx < minX || nx > maxX || ny < minY || ny > maxY || nz < minZ || nz > maxZ) {
                     continue;
                 }
-                long nkey = packPos(nx, ny, nz);
-                if (reached.contains(nkey)) {
+                if (reached.contains(nx, ny, nz)) {
                     continue;
                 }
                 if (this.isPrefabOccluder(nx, ny, nz, index, settings, classifierCache)) {
                     continue;
                 }
-                reached.add(nkey);
-                queue.enqueue(nkey);
+                reached.add(nx, ny, nz);
+                queue.enqueue(PackedPos.pack(nx, ny, nz));
             }
         }
+
+        int shell = settings.shellThickness();
+        if (shell > 1) {
+            expandShell(reached, minX, maxX, minY, maxY, minZ, maxZ, shell - 1);
+        }
         return reached;
+    }
+
+    private static void expandShell(
+        @Nonnull ReachabilityMap reached,
+        int minX, int maxX,
+        int minY, int maxY,
+        int minZ, int maxZ,
+        int extraSteps
+    ) {
+        LongArrayFIFOQueue frontier = collectPositions(reached);
+
+        for (int step = 0; step < extraSteps; step++) {
+            LongArrayFIFOQueue nextFrontier = new LongArrayFIFOQueue();
+            while (!frontier.isEmpty()) {
+                long key = frontier.dequeueLong();
+                int x = PackedPos.unpackX(key), y = PackedPos.unpackY(key), z = PackedPos.unpackZ(key);
+                for (int[] d : NEIGHBORS) {
+                    int nx = x + d[0], ny = y + d[1], nz = z + d[2];
+                    if (nx < minX || nx > maxX || ny < minY || ny > maxY || nz < minZ || nz > maxZ) {
+                        continue;
+                    }
+                    if (!reached.add(nx, ny, nz)) {
+                        continue;
+                    }
+                    nextFrontier.enqueue(PackedPos.pack(nx, ny, nz));
+                }
+            }
+            frontier = nextFrontier;
+            if (frontier.isEmpty()) {
+                break;
+            }
+        }
+    }
+
+    @Nonnull
+    private static LongArrayFIFOQueue collectPositions(@Nonnull ReachabilityMap reached) {
+        LongArrayFIFOQueue queue = new LongArrayFIFOQueue();
+        reached.forEachPosition((x, y, z) -> queue.enqueue(PackedPos.pack(x, y, z)));
+        return queue;
     }
 
     private boolean isPrefabOccluder(
@@ -243,7 +373,7 @@ final class PrefabBatchOptimizer {
         @Nonnull OptimizerSettings settings,
         @Nonnull Int2BooleanMap classifierCache
     ) {
-        long key = packPos(x, y, z);
+        long key = PackedPos.pack(x, y, z);
         if (index.nonZeroFillers().contains(key)) {
             return true;
         }
@@ -263,28 +393,30 @@ final class PrefabBatchOptimizer {
         @Nonnull Set<Long> fluidNeighborhood,
         @Nonnull PrefabBlockIndex index,
         @Nonnull Int2BooleanMap classifierCache,
-        LongSet reachableAir
+        @Nullable ReachabilityMap reachableAir
     ) {
         if (block.filler() != 0 || !this.classify(block.blockId(), settings, classifierCache)) {
             return false;
         }
-        if (settings.preserveFluidAdjacentBlocks() && fluidNeighborhood.contains(packPos(x, y, z))) {
+        if (settings.preserveFluidAdjacentBlocks() && fluidNeighborhood.contains(PackedPos.pack(x, y, z))) {
             return false;
         }
 
         if (reachableAir != null) {
             for (int[] d : NEIGHBORS) {
-                if (reachableAir.contains(packPos(x + d[0], y + d[1], z + d[2]))) {
+                if (reachableAir.contains(x + d[0], y + d[1], z + d[2])) {
                     return false;
                 }
             }
             return true;
         }
 
-        return this.isNeighborSolid(x + 1, y, z, settings, index, classifierCache)
+        boolean bottomOkay = settings.skipBottomFace()
+            || this.isNeighborSolid(x, y - 1, z, settings, index, classifierCache);
+        return bottomOkay
+            && this.isNeighborSolid(x + 1, y, z, settings, index, classifierCache)
             && this.isNeighborSolid(x - 1, y, z, settings, index, classifierCache)
             && this.isNeighborSolid(x, y + 1, z, settings, index, classifierCache)
-            && this.isNeighborSolid(x, y - 1, z, settings, index, classifierCache)
             && this.isNeighborSolid(x, y, z + 1, settings, index, classifierCache)
             && this.isNeighborSolid(x, y, z - 1, settings, index, classifierCache);
     }
@@ -297,7 +429,7 @@ final class PrefabBatchOptimizer {
         @Nonnull PrefabBlockIndex index,
         @Nonnull Int2BooleanMap classifierCache
     ) {
-        long key = packPos(x, y, z);
+        long key = PackedPos.pack(x, y, z);
         if (index.nonZeroFillers().contains(key)) {
             return false;
         }
@@ -315,25 +447,6 @@ final class PrefabBatchOptimizer {
         boolean result = this.classifier.isOptimizableFullCube(blockId, settings);
         cache.put(blockId, result);
         return result;
-    }
-
-    private static long packPos(int x, int y, int z) {
-        long lx = ((long) x) & 0x1FFFFFL;
-        long ly = ((long) y) & 0x1FFFFFL;
-        long lz = ((long) z) & 0x1FFFFFL;
-        return (lx << 42) | (ly << 21) | lz;
-    }
-
-    private static int unpackX(long key) {
-        return (int) ((key << 1) >> 43);
-    }
-
-    private static int unpackY(long key) {
-        return (int) ((key << 22) >> 43);
-    }
-
-    private static int unpackZ(long key) {
-        return (int) ((key << 43) >> 43);
     }
 
     @Nonnull

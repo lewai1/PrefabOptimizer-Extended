@@ -15,7 +15,12 @@ public final class OptimizerEventData {
     static final String KEY_STRICT_CUBE_ONLY = "@StrictCubeOnly";
     static final String KEY_PRESERVE_FLUID_ADJACENT = "@PreserveFluidAdjacent";
     static final String KEY_FLOOD_FILL_INTERIOR = "@FloodFillInterior";
+    static final String KEY_SHELL_THICKNESS = "@ShellThickness";
+    static final String KEY_SKIP_BOTTOM_FACE = "@SkipBottomFace";
+    static final String KEY_PREVIEW_ONLY = "@PreviewOnly";
     static final String KEY_EXCLUDED_BLOCKS = "@ExcludedBlocks";
+    static final String KEY_BLOCK_SEARCH_QUERY = "@BlockSearchQuery";
+    static final String KEY_BLOCK_TOKEN = "BlockToken";
     static final String KEY_RECURSIVE_FOLDERS = "@RecursiveFolders";
     static final String KEY_TARGET_PACK = "@TargetPack";
     static final String KEY_TARGET_FOLDER = "@TargetFolder";
@@ -29,7 +34,12 @@ public final class OptimizerEventData {
     public Boolean strictCubeOnly;
     public Boolean preserveFluidAdjacent;
     public Boolean floodFillInterior;
+    public String shellThickness;
+    public Boolean skipBottomFace;
+    public Boolean previewOnly;
     public String excludedBlocks;
+    public String blockSearchQuery;
+    public String blockToken;
     public Boolean recursiveFolders;
     public String targetPack;
     public String targetFolder;
@@ -40,6 +50,9 @@ public final class OptimizerEventData {
             this.strictCubeOnly,
             this.preserveFluidAdjacent,
             this.floodFillInterior,
+            this.shellThickness,
+            this.skipBottomFace,
+            this.previewOnly,
             this.excludedBlocks
         );
     }
@@ -54,7 +67,12 @@ public final class OptimizerEventData {
         .append(new KeyedCodec<>(KEY_STRICT_CUBE_ONLY, Codec.BOOLEAN), (data, value) -> data.strictCubeOnly = value, data -> data.strictCubeOnly).add()
         .append(new KeyedCodec<>(KEY_PRESERVE_FLUID_ADJACENT, Codec.BOOLEAN), (data, value) -> data.preserveFluidAdjacent = value, data -> data.preserveFluidAdjacent).add()
         .append(new KeyedCodec<>(KEY_FLOOD_FILL_INTERIOR, Codec.BOOLEAN), (data, value) -> data.floodFillInterior = value, data -> data.floodFillInterior).add()
+        .append(new KeyedCodec<>(KEY_SHELL_THICKNESS, Codec.STRING), (data, value) -> data.shellThickness = value, data -> data.shellThickness).add()
+        .append(new KeyedCodec<>(KEY_SKIP_BOTTOM_FACE, Codec.BOOLEAN), (data, value) -> data.skipBottomFace = value, data -> data.skipBottomFace).add()
+        .append(new KeyedCodec<>(KEY_PREVIEW_ONLY, Codec.BOOLEAN), (data, value) -> data.previewOnly = value, data -> data.previewOnly).add()
         .append(new KeyedCodec<>(KEY_EXCLUDED_BLOCKS, Codec.STRING), (data, value) -> data.excludedBlocks = value, data -> data.excludedBlocks).add()
+        .append(new KeyedCodec<>(KEY_BLOCK_SEARCH_QUERY, Codec.STRING), (data, value) -> data.blockSearchQuery = value, data -> data.blockSearchQuery).add()
+        .append(new KeyedCodec<>(KEY_BLOCK_TOKEN, Codec.STRING), (data, value) -> data.blockToken = value, data -> data.blockToken).add()
         .append(new KeyedCodec<>(KEY_RECURSIVE_FOLDERS, Codec.BOOLEAN), (data, value) -> data.recursiveFolders = value, data -> data.recursiveFolders).add()
         .append(new KeyedCodec<>(KEY_TARGET_PACK, Codec.STRING), (data, value) -> data.targetPack = value, data -> data.targetPack).add()
         .append(new KeyedCodec<>(KEY_TARGET_FOLDER, Codec.STRING), (data, value) -> data.targetFolder = value, data -> data.targetFolder).add()

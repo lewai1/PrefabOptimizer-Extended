@@ -15,7 +15,6 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.accessor.LocalCachedChunkAccessor;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import it.unimi.dsi.fastutil.longs.LongSet;
 import java.lang.reflect.Method;
 import java.util.Locale;
 import javax.annotation.Nonnull;
@@ -63,8 +62,8 @@ final class SelectionOptimizationService {
             );
 
             OccludedBlockMask primingMask = new OccludedBlockMask(this.classifier, settings);
-            LongSet reachableAir = settings.floodFillInterior()
-                ? SelectionFloodFill.computeReachableAir(accessor, bounds, primingMask)
+            ReachabilityMap reachableAir = settings.floodFillInterior()
+                ? SelectionFloodFill.computeReachableAir(accessor, bounds, primingMask, settings)
                 : null;
             OccludedBlockMask mask = reachableAir == null
                 ? primingMask
@@ -75,6 +74,15 @@ final class SelectionOptimizationService {
                 playerRef.sendMessage(Message.raw(
                     "PrefabOptimizer-Extended finished: removed 0/" + stats.processedBlocks()
                         + " blocks (" + formatPercentage(stats.removedBlockPercentage()) + " optimized)."
+                ));
+                return;
+            }
+
+            if (settings.previewOnly()) {
+                playerRef.sendMessage(Message.raw(
+                    "PrefabOptimizer-Extended preview: would remove " + stats.removedBlocks() + "/" + stats.processedBlocks()
+                        + " blocks (" + formatPercentage(stats.removedBlockPercentage())
+                        + " optimized). Uncheck 'Preview only' to apply."
                 ));
                 return;
             }

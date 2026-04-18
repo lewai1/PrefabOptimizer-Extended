@@ -10,6 +10,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import dev.lewai.prefaboptimizerextended.commands.subcommands.PrefabBatchOptimizerSubCommand;
 import dev.lewai.prefaboptimizerextended.commands.subcommands.SelectionOptimizerSubCommand;
+import dev.lewai.prefaboptimizerextended.commands.subcommands.UndoSubCommand;
 import javax.annotation.Nonnull;
 
 public final class PrefabOptimizerCommand extends AbstractPlayerCommand {
@@ -19,6 +20,7 @@ public final class PrefabOptimizerCommand extends AbstractPlayerCommand {
         this.setPermissionGroup(GameMode.Creative);
         this.addSubCommand(new SelectionOptimizerSubCommand());
         this.addSubCommand(new PrefabBatchOptimizerSubCommand());
+        this.addSubCommand(new UndoSubCommand());
     }
 
     @Override

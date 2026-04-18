@@ -8,7 +8,6 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Collection;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
 import javax.annotation.Nonnull;
@@ -51,25 +50,15 @@ public final class PrefabOptimizerService {
     }
 
     @Nonnull
-    public static PrefabOptimizationResult optimizePrefabSources(
+    public static BatchHandle optimizePrefabSourcesAsync(
         @Nonnull Collection<String> sourceVirtualPaths,
         @Nonnull AssetPack targetPack,
         @Nonnull String targetFolder,
         @Nonnull OptimizerSettings settings,
-        boolean recursiveFolders
+        boolean recursiveFolders,
+        @Nonnull BatchProgressListener progressListener
     ) {
-        return PREFAB_BATCH_OPTIMIZER.optimize(sourceVirtualPaths, targetPack, targetFolder, settings, recursiveFolders);
-    }
-
-    @Nonnull
-    public static CompletableFuture<PrefabOptimizationResult> optimizePrefabSourcesAsync(
-        @Nonnull Collection<String> sourceVirtualPaths,
-        @Nonnull AssetPack targetPack,
-        @Nonnull String targetFolder,
-        @Nonnull OptimizerSettings settings,
-        boolean recursiveFolders
-    ) {
-        return PREFAB_BATCH_OPTIMIZER.optimizeAsync(sourceVirtualPaths, targetPack, targetFolder, settings, recursiveFolders);
+        return PREFAB_BATCH_OPTIMIZER.optimizeAsync(sourceVirtualPaths, targetPack, targetFolder, settings, recursiveFolders, progressListener);
     }
 
     @Nonnull

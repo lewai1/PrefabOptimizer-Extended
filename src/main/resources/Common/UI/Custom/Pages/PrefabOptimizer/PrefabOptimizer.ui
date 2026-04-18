@@ -118,7 +118,8 @@ $C.@PageOverlay {
         Panel { Anchor: (Width: 12, Height: 1); }
 
         Group #OptionsPanel {
-          LayoutMode: Top;
+          LayoutMode: TopScrolling;
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
           Anchor: (Width: 380);
           Padding: (Full: 10);
           Background: @Panel;
@@ -149,6 +150,21 @@ $C.@PageOverlay {
             Label { Text: "Flood-fill interior mode (remove anything unreachable from outside, more aggressive)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
           }
 
+          Group { LayoutMode: Left; Anchor: (Height: 28);
+            Label { Text: "Shell thickness (flood-fill): keep N layers"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
+            $C.@TextField #ShellThickness { Anchor: (Width: 50, Height: 26); PlaceholderText: "1"; }
+          }
+
+          Group { LayoutMode: Left; Anchor: (Height: 28);
+            $C.@CheckBox #SkipBottomFace { Anchor: (Width: 28, Height: 28); Value: false; }
+            Label { Text: "Skip bottom face (prefab sits on the ground)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
+          }
+
+          Group { LayoutMode: Left; Anchor: (Height: 28);
+            $C.@CheckBox #PreviewOnly { Anchor: (Width: 28, Height: 28); Value: false; }
+            Label { Text: "Preview only (no files written, report only)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
+          }
+
           Label {
             Text: "Exclude blocks by regex, or comma-separated text tokens";
             Style: (FontSize: 12, TextColor: #9ab2bc);
@@ -159,6 +175,34 @@ $C.@PageOverlay {
             Anchor: (Height: 34);
             PlaceholderText: "Example: ^UnstableRifts_|Glass|Water";
             PlaceholderStyle: (TextColor: #586971, FontSize: 12);
+          }
+
+          Group { LayoutMode: Left; Anchor: (Height: 30, Top: 4);
+            TextButton #AddFluidsButton { FlexWeight: 1; Anchor: (Height: 26); Text: "+ Fluids"; Style: @PrimaryButton; }
+            Panel { Anchor: (Width: 6, Height: 1); }
+            TextButton #AddDecorButton { FlexWeight: 1; Anchor: (Height: 26); Text: "+ Decor"; Style: @PrimaryButton; }
+            Panel { Anchor: (Width: 6, Height: 1); }
+            TextButton #ClearExcludedButton { FlexWeight: 1; Anchor: (Height: 26); Text: "Clear"; Style: @PrimaryButton; }
+          }
+
+          Label {
+            Text: "Browse blocks (click to add exact ID to exclusion)";
+            Style: (FontSize: 12, TextColor: #9ab2bc);
+            Anchor: (Height: 20, Top: 6);
+          }
+
+          $C.@TextField #BlockSearchInput {
+            Anchor: (Height: 30);
+            PlaceholderText: "Type to filter...";
+            PlaceholderStyle: (TextColor: #586971, FontSize: 12);
+          }
+
+          Group #BlockSuggestions {
+            Anchor: (Height: 110);
+            LayoutMode: TopScrolling;
+            ScrollbarStyle: $C.@DefaultScrollbarStyle;
+            Padding: (Right: 8);
+            Background: #0a0e10(0.45);
           }
 
           Panel { Anchor: (Height: 12); Background: #000000(0); }
@@ -173,7 +217,7 @@ $C.@PageOverlay {
           }
 
           Group #SelectedSourceList {
-            Anchor: (Height: 190);
+            Anchor: (Height: 130);
             LayoutMode: TopScrolling;
             ScrollbarStyle: $C.@DefaultScrollbarStyle;
             Padding: (Right: 8);

@@ -7,7 +7,6 @@ import com.hypixel.hytale.server.core.universe.world.accessor.BlockAccessor;
 import com.hypixel.hytale.server.core.universe.world.accessor.ChunkAccessor;
 import it.unimi.dsi.fastutil.ints.Int2BooleanMap;
 import it.unimi.dsi.fastutil.ints.Int2BooleanOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongSet;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -26,16 +25,16 @@ public final class OccludedBlockMask extends BlockMask {
     private final OptimizerSettings settings;
     private final Int2BooleanMap classifierCache = new Int2BooleanOpenHashMap();
     @Nullable
-    private final LongSet reachableAir;
+    private final ReachabilityMap reachableAir;
 
     public OccludedBlockMask(@Nonnull BlockClassifier classifier, @Nonnull OptimizerSettings settings) {
         this(classifier, settings, null);
     }
 
-    public OccludedBlockMask(
+    OccludedBlockMask(
         @Nonnull BlockClassifier classifier,
         @Nonnull OptimizerSettings settings,
-        @Nullable LongSet reachableAir
+        @Nullable ReachabilityMap reachableAir
     ) {
         super(BlockFilter.EMPTY_ARRAY);
         this.classifier = classifier;
@@ -89,7 +88,7 @@ public final class OccludedBlockMask extends BlockMask {
                 int nx = x + neighbor[0];
                 int ny = y + neighbor[1];
                 int nz = z + neighbor[2];
-                if (this.reachableAir.contains(SelectionFloodFill.packPos(nx, ny, nz))) {
+                if (this.reachableAir.contains(nx, ny, nz)) {
                     return false;
                 }
                 if (preserveFluidAdjacent && bounds.contains(nx, ny, nz)) {
@@ -102,10 +101,15 @@ public final class OccludedBlockMask extends BlockMask {
             return true;
         }
 
+        boolean skipBottom = this.settings.skipBottomFace();
         for (int[] neighbor : NEIGHBORS) {
             int nx = x + neighbor[0];
             int ny = y + neighbor[1];
             int nz = z + neighbor[2];
+            boolean isBottomNeighbor = neighbor[1] == -1;
+            if (isBottomNeighbor && skipBottom) {
+                continue;
+            }
             if (!bounds.contains(nx, ny, nz)) {
                 return false;
             }

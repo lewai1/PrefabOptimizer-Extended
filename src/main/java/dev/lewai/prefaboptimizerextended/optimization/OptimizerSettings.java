@@ -10,11 +10,15 @@ import javax.annotation.Nullable;
 
 public final class OptimizerSettings {
     private static final Pattern TOKEN_SEPARATOR = Pattern.compile("[,;\\n]");
+    private static final int MAX_SHELL_THICKNESS = 64;
 
     private final boolean preserveTransparentBlocks;
     private final boolean strictCubeOnly;
     private final boolean preserveFluidAdjacentBlocks;
     private final boolean floodFillInterior;
+    private final int shellThickness;
+    private final boolean skipBottomFace;
+    private final boolean previewOnly;
     private final String excludedBlocksRaw;
     @Nullable
     private final Pattern excludedBlocksPattern;
@@ -27,6 +31,9 @@ public final class OptimizerSettings {
         boolean strictCubeOnly,
         boolean preserveFluidAdjacentBlocks,
         boolean floodFillInterior,
+        int shellThickness,
+        boolean skipBottomFace,
+        boolean previewOnly,
         @Nonnull String excludedBlocksRaw,
         @Nullable Pattern excludedBlocksPattern,
         @Nonnull List<String> excludedBlockTokens,
@@ -36,6 +43,9 @@ public final class OptimizerSettings {
         this.strictCubeOnly = strictCubeOnly;
         this.preserveFluidAdjacentBlocks = preserveFluidAdjacentBlocks;
         this.floodFillInterior = floodFillInterior;
+        this.shellThickness = shellThickness;
+        this.skipBottomFace = skipBottomFace;
+        this.previewOnly = previewOnly;
         this.excludedBlocksRaw = excludedBlocksRaw;
         this.excludedBlocksPattern = excludedBlocksPattern;
         this.excludedBlockTokens = List.copyOf(excludedBlockTokens);
@@ -47,6 +57,9 @@ public final class OptimizerSettings {
         @Nullable Boolean strictCubeOnly,
         @Nullable Boolean preserveFluidAdjacentBlocks,
         @Nullable Boolean floodFillInterior,
+        @Nullable String shellThicknessRaw,
+        @Nullable Boolean skipBottomFace,
+        @Nullable Boolean previewOnly,
         @Nullable String excludedBlocksRaw
     ) {
         String raw = excludedBlocksRaw == null ? "" : excludedBlocksRaw.trim();
@@ -57,6 +70,9 @@ public final class OptimizerSettings {
             strictCubeOnly == null || strictCubeOnly,
             preserveFluidAdjacentBlocks == null || preserveFluidAdjacentBlocks,
             floodFillInterior != null && floodFillInterior,
+            parseShellThickness(shellThicknessRaw),
+            skipBottomFace != null && skipBottomFace,
+            previewOnly != null && previewOnly,
             raw,
             exclusionRules.pattern(),
             exclusionRules.tokens(),
@@ -78,6 +94,18 @@ public final class OptimizerSettings {
 
     public boolean floodFillInterior() {
         return this.floodFillInterior;
+    }
+
+    public int shellThickness() {
+        return this.shellThickness;
+    }
+
+    public boolean skipBottomFace() {
+        return this.skipBottomFace;
+    }
+
+    public boolean previewOnly() {
+        return this.previewOnly;
     }
 
     @Nonnull
@@ -107,6 +135,21 @@ public final class OptimizerSettings {
             }
         }
         return false;
+    }
+
+    static int parseShellThickness(@Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return 1;
+        }
+        try {
+            int value = Integer.parseInt(raw.trim());
+            if (value < 1) {
+                return 1;
+            }
+            return Math.min(value, MAX_SHELL_THICKNESS);
+        } catch (NumberFormatException ignored) {
+            return 1;
+        }
     }
 
     @Nonnull

@@ -18,8 +18,11 @@ import javax.annotation.Nonnull;
 
 public final class SelectionOptimizerPage extends InteractiveCustomUIPage<SelectionEventData> {
     private static final String LAYOUT_PATH = "Pages/PrefabOptimizer/SelectionOptimizer.ui";
+    private static final String FLUID_TOKENS = "water,lava";
+    private static final String DECOR_TOKENS = "leaves,vines,flowers,grass,torch,door,window,sign";
 
     private String status = "Adjust the optimizer settings, then optimize the current BuilderTools selection.";
+    private String excludedBlocks = "";
 
     public SelectionOptimizerPage(@Nonnull PlayerRef playerRef) {
         super(playerRef, CustomPageLifetime.CanDismiss, SelectionEventData.CODEC);
@@ -34,12 +37,16 @@ public final class SelectionOptimizerPage extends InteractiveCustomUIPage<Select
     ) {
         ui.append(LAYOUT_PATH);
         ui.set("#StatusLabel.Text", this.status);
+        ui.set("#ExcludedBlocks.Value", this.excludedBlocks);
         this.bindActions(events);
     }
 
     private void bindActions(@Nonnull UIEventBuilder events) {
         events.addEventBinding(CustomUIEventBindingType.Activating, "#CloseButton", actionData(Action.CLOSE), false);
         events.addEventBinding(CustomUIEventBindingType.Activating, "#OptimizeSelectionButton", settingsActionData(), false);
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#AddFluidsButton", presetData(Action.ADD_FLUIDS), false);
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#AddDecorButton", presetData(Action.ADD_DECOR), false);
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#ClearExcludedButton", presetData(Action.CLEAR_EXCLUDED), false);
     }
 
     @Override
@@ -59,27 +66,60 @@ public final class SelectionOptimizerPage extends InteractiveCustomUIPage<Select
             return;
         }
 
+        if (data.excludedBlocks != null) {
+            this.excludedBlocks = data.excludedBlocks;
+        }
+
         switch (action) {
             case CLOSE -> player.getPageManager().setPage(ref, store, Page.None);
+            case ADD_FLUIDS -> this.appendTokens(FLUID_TOKENS);
+            case ADD_DECOR -> this.appendTokens(DECOR_TOKENS);
+            case CLEAR_EXCLUDED -> {
+                this.excludedBlocks = "";
+                this.refreshExcluded();
+            }
             case OPTIMIZE_SELECTION -> {
                 if (PrefabOptimizerService.optimizeSelection(ref, store, player, this.playerRef, data.toSettings())) {
                     this.playerRef.sendMessage(Message.raw("PrefabOptimizer-Extended: selection optimization is in process. You will be notified when it finishes."));
                     player.getPageManager().setPage(ref, store, Page.None);
                 } else {
                     this.status = "Could not queue the selection optimization.";
-                    UICommandBuilder ui = new UICommandBuilder();
-                    UIEventBuilder events = new UIEventBuilder();
-                    ui.set("#StatusLabel.Text", this.status);
-                    this.bindActions(events);
-                    this.sendUpdate(ui, events, false);
+                    this.refreshStatus();
                 }
             }
         }
     }
 
+    private void appendTokens(@Nonnull String tokens) {
+        String current = this.excludedBlocks == null ? "" : this.excludedBlocks.trim();
+        this.excludedBlocks = current.isBlank() ? tokens : current + "," + tokens;
+        this.refreshExcluded();
+    }
+
+    private void refreshExcluded() {
+        UICommandBuilder ui = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        ui.set("#ExcludedBlocks.Value", this.excludedBlocks);
+        this.bindActions(events);
+        this.sendUpdate(ui, events, false);
+    }
+
+    private void refreshStatus() {
+        UICommandBuilder ui = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        ui.set("#StatusLabel.Text", this.status);
+        this.bindActions(events);
+        this.sendUpdate(ui, events, false);
+    }
+
     @Nonnull
     private static EventData actionData(@Nonnull Action action) {
         return new EventData().put(SelectionEventData.KEY_ACTION, action.name());
+    }
+
+    @Nonnull
+    private static EventData presetData(@Nonnull Action action) {
+        return actionData(action).put(SelectionEventData.KEY_EXCLUDED_BLOCKS, "#ExcludedBlocks.Value");
     }
 
     @Nonnull
@@ -89,11 +129,17 @@ public final class SelectionOptimizerPage extends InteractiveCustomUIPage<Select
             .put(SelectionEventData.KEY_STRICT_CUBE_ONLY, "#StrictCubeOnly.Value")
             .put(SelectionEventData.KEY_PRESERVE_FLUID_ADJACENT, "#PreserveFluidAdjacent.Value")
             .put(SelectionEventData.KEY_FLOOD_FILL_INTERIOR, "#FloodFillInterior.Value")
+            .put(SelectionEventData.KEY_SHELL_THICKNESS, "#ShellThickness.Value")
+            .put(SelectionEventData.KEY_SKIP_BOTTOM_FACE, "#SkipBottomFace.Value")
+            .put(SelectionEventData.KEY_PREVIEW_ONLY, "#PreviewOnly.Value")
             .put(SelectionEventData.KEY_EXCLUDED_BLOCKS, "#ExcludedBlocks.Value");
     }
 
     private enum Action {
         CLOSE,
-        OPTIMIZE_SELECTION
+        OPTIMIZE_SELECTION,
+        ADD_FLUIDS,
+        ADD_DECOR,
+        CLEAR_EXCLUDED
     }
 }

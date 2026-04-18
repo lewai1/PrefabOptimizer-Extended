@@ -9,6 +9,7 @@ import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.protocol.packets.interface_.Page;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.AssetModule;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
@@ -20,6 +21,8 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import dev.lewai.prefaboptimizerextended.optimization.BatchHandle;
+import dev.lewai.prefaboptimizerextended.optimization.BatchProgressListener;
 import dev.lewai.prefaboptimizerextended.optimization.OptimizerSettings;
 import dev.lewai.prefaboptimizerextended.optimization.PrefabOptimizationResult;
 import dev.lewai.prefaboptimizerextended.optimization.PrefabOptimizerService;
@@ -34,18 +37,27 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public final class PrefabOptimizerPage extends InteractiveCustomUIPage<OptimizerEventData> {
     private static final String LAYOUT_PATH = "Pages/PrefabOptimizer/PrefabOptimizer.ui";
     private static final String FILE_LIST_PATH = "#FileList";
     private static final String SELECTED_LIST_PATH = "#SelectedSourceList";
+    private static final String BLOCK_SUGGESTIONS_PATH = "#BlockSuggestions";
     private static final Value<String> SELECTED_BUTTON_STYLE = Value.ref("Pages/BasicTextButton.ui", "SelectedLabelStyle");
+    private static final String FLUID_TOKENS = "water,lava";
+    private static final String DECOR_TOKENS = "leaves,vines,flowers,grass,torch,door,window,sign";
+    private static final int MAX_BLOCK_SUGGESTIONS = 30;
 
     private final Set<String> selectedSources = new LinkedHashSet<>();
     private Path sourceCurrentDir = Paths.get("");
     private String sourceSearchQuery = "";
+    private String blockSearchQuery = "";
     private String status = "Choose prefabs or folders, select the target asset-only mod, then optimize the batch.";
+    private String excludedBlocks = "";
     private volatile boolean batchRunning = false;
+    @Nullable
+    private volatile BatchHandle batchHandle = null;
 
     public PrefabOptimizerPage(@Nonnull PlayerRef playerRef) {
         super(playerRef, CustomPageLifetime.CanDismiss, OptimizerEventData.CODEC);
@@ -62,7 +74,10 @@ public final class PrefabOptimizerPage extends InteractiveCustomUIPage<Optimizer
         this.bindStaticActions(events);
         this.buildSourceBrowser(ui, events);
         this.buildSelectedSourceList(ui, events);
+        this.buildBlockSuggestions(ui, events);
         this.buildTargetPackDropdown(ui);
+        ui.set("#ExcludedBlocks.Value", this.excludedBlocks);
+        ui.set("#BlockSearchInput.Value", this.blockSearchQuery);
         this.applyStatus(ui);
     }
 
@@ -84,10 +99,19 @@ public final class PrefabOptimizerPage extends InteractiveCustomUIPage<Optimizer
             this.sendSourceUpdate();
             return;
         }
+        if (data.blockSearchQuery != null) {
+            this.blockSearchQuery = data.blockSearchQuery.trim();
+            this.sendBlockSuggestionsUpdate();
+            return;
+        }
         if (data.file != null || data.searchResult != null) {
             this.handleSourceBrowserEvent(data);
             this.sendSourceUpdate();
             return;
+        }
+
+        if (data.excludedBlocks != null) {
+            this.excludedBlocks = data.excludedBlocks;
         }
 
         Action action = UiActions.parse(Action.class, data.action);
@@ -113,12 +137,24 @@ public final class PrefabOptimizerPage extends InteractiveCustomUIPage<Optimizer
                 }
                 this.sendSourceUpdate();
             }
-            case OPTIMIZE_PREFABS -> {
-                if (this.optimizeSelectedPrefabs(data)) {
-                    player.getPageManager().setPage(ref, store, Page.None);
-                } else {
-                    this.sendStatusUpdate();
+            case ADD_FLUIDS -> this.appendExclusion(FLUID_TOKENS);
+            case ADD_DECOR -> this.appendExclusion(DECOR_TOKENS);
+            case CLEAR_EXCLUDED -> {
+                this.excludedBlocks = "";
+                this.sendExclusionUpdate();
+            }
+            case ADD_BLOCK_TOKEN -> {
+                if (data.blockToken != null && !data.blockToken.isBlank()) {
+                    this.appendExclusion(data.blockToken.trim());
                 }
+            }
+            case OPTIMIZE_PREFABS -> {
+                if (this.batchRunning) {
+                    this.cancelBatch();
+                } else {
+                    this.startBatch(data);
+                }
+                this.sendStatusUpdate();
             }
         }
     }
@@ -128,6 +164,60 @@ public final class PrefabOptimizerPage extends InteractiveCustomUIPage<Optimizer
         events.addEventBinding(CustomUIEventBindingType.Activating, "#AddFolderButton", actionData(Action.ADD_CURRENT_FOLDER), false);
         events.addEventBinding(CustomUIEventBindingType.Activating, "#ClearSourcesButton", actionData(Action.CLEAR_SOURCES), false);
         events.addEventBinding(CustomUIEventBindingType.Activating, "#OptimizePrefabsButton", settingsActionData(Action.OPTIMIZE_PREFABS), false);
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#AddFluidsButton", presetData(Action.ADD_FLUIDS), false);
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#AddDecorButton", presetData(Action.ADD_DECOR), false);
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#ClearExcludedButton", presetData(Action.CLEAR_EXCLUDED), false);
+        events.addEventBinding(
+            CustomUIEventBindingType.ValueChanged,
+            "#BlockSearchInput",
+            EventData.of(OptimizerEventData.KEY_BLOCK_SEARCH_QUERY, "#BlockSearchInput.Value"),
+            false
+        );
+    }
+
+    private void buildBlockSuggestions(@Nonnull UICommandBuilder ui, @Nonnull UIEventBuilder events) {
+        ui.clear(BLOCK_SUGGESTIONS_PATH);
+        if (this.blockSearchQuery.isBlank()) {
+            ui.append(BLOCK_SUGGESTIONS_PATH, "Pages/BasicTextButton.ui");
+            ui.set(BLOCK_SUGGESTIONS_PATH + "[0].Text", "Type above to browse block IDs...");
+            return;
+        }
+        String needle = this.blockSearchQuery.toLowerCase(Locale.ROOT);
+        int index = 0;
+        try {
+            for (BlockType type : BlockType.getAssetMap().getAssetMap().values()) {
+                if (type == null || type.isUnknown()) {
+                    continue;
+                }
+                String id = type.getId();
+                if (id == null || id.isBlank()) {
+                    continue;
+                }
+                if (!id.toLowerCase(Locale.ROOT).contains(needle)) {
+                    continue;
+                }
+                String itemPath = BLOCK_SUGGESTIONS_PATH + "[" + index + "]";
+                ui.append(BLOCK_SUGGESTIONS_PATH, "Pages/BasicTextButton.ui");
+                ui.set(itemPath + ".Text", "+ " + id);
+                events.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    itemPath,
+                    actionData(Action.ADD_BLOCK_TOKEN).put(OptimizerEventData.KEY_BLOCK_TOKEN, id),
+                    false
+                );
+                if (++index >= MAX_BLOCK_SUGGESTIONS) {
+                    break;
+                }
+            }
+        } catch (LinkageError | RuntimeException e) {
+            ui.append(BLOCK_SUGGESTIONS_PATH, "Pages/BasicTextButton.ui");
+            ui.set(BLOCK_SUGGESTIONS_PATH + "[0].Text", "Could not browse blocks: " + e.getClass().getSimpleName());
+            return;
+        }
+        if (index == 0) {
+            ui.append(BLOCK_SUGGESTIONS_PATH, "Pages/BasicTextButton.ui");
+            ui.set(BLOCK_SUGGESTIONS_PATH + "[0].Text", "No match for '" + this.blockSearchQuery + "'");
+        }
     }
 
     private void buildSourceBrowser(@Nonnull UICommandBuilder ui, @Nonnull UIEventBuilder events) {
@@ -217,8 +307,8 @@ public final class PrefabOptimizerPage extends InteractiveCustomUIPage<Optimizer
 
     private void applyStatus(@Nonnull UICommandBuilder ui) {
         ui.set("#StatusLabel.Text", this.status);
-        ui.set("#OptimizePrefabsButton.Disabled", this.batchRunning);
-        ui.set("#OptimizePrefabsButton.Text", this.batchRunning ? "Optimizing Prefab Batch..." : "Optimize Prefab Batch");
+        ui.set("#OptimizePrefabsButton.Disabled", false);
+        ui.set("#OptimizePrefabsButton.Text", this.batchRunning ? "Cancel Batch" : "Optimize Prefab Batch");
     }
 
     private void handleSourceBrowserEvent(@Nonnull OptimizerEventData data) {
@@ -265,61 +355,103 @@ public final class PrefabOptimizerPage extends InteractiveCustomUIPage<Optimizer
         this.status = "Added folder: " + virtualPath;
     }
 
-    private boolean optimizeSelectedPrefabs(@Nonnull OptimizerEventData data) {
-        if (this.batchRunning) {
-            this.status = "A prefab batch optimization is already running.";
-            return false;
-        }
+    private void startBatch(@Nonnull OptimizerEventData data) {
         if (this.selectedSources.isEmpty()) {
             this.status = "Select at least one prefab or folder first.";
-            return false;
+            return;
         }
         AssetPack targetPack = data.targetPack == null || data.targetPack.isBlank()
             ? null
             : AssetModule.get().getAssetPack(data.targetPack);
         if (targetPack == null || !isWritableAssetOnlyPack(targetPack)) {
             this.status = "Choose a writable asset-only target mod first.";
-            return false;
+            return;
         }
         String targetFolder = data.targetFolder == null || data.targetFolder.isBlank() ? "Optimized" : data.targetFolder.trim();
         OptimizerSettings settings = data.toSettings();
         List<String> sources = List.copyOf(this.selectedSources);
 
         this.batchRunning = true;
-        this.status = "Prefab batch optimization is in process for " + sources.size()
-            + " selected prefab source" + (sources.size() == 1 ? "" : "s") + ".";
+        String prefix = settings.previewOnly() ? "Preview" : "Optimization";
+        this.status = prefix + " in progress for " + sources.size()
+            + " selected prefab source" + (sources.size() == 1 ? "" : "s") + ". 0/" + sources.size() + " done.";
         this.playerRef.sendMessage(Message.raw("PrefabOptimizer-Extended: " + this.status));
 
-        PrefabOptimizerService.optimizePrefabSourcesAsync(
+        BatchProgressListener listener = (done, total) -> {
+            this.status = prefix + " in progress: " + done + "/" + total
+                + " (" + (total == 0 ? 100 : (100 * done / total)) + "%). Click 'Cancel Batch' to stop.";
+            this.sendStatusUpdate();
+        };
+
+        BatchHandle handle = PrefabOptimizerService.optimizePrefabSourcesAsync(
             sources,
             targetPack,
             targetFolder,
             settings,
-            defaultTrue(data.recursiveFolders)
-        ).whenComplete((result, throwable) -> this.handleBatchFinished(targetPack, result, throwable));
-        return true;
+            defaultTrue(data.recursiveFolders),
+            listener
+        );
+        this.batchHandle = handle;
+        handle.future().whenComplete((result, throwable) -> this.handleBatchFinished(targetPack, settings, result, throwable));
+    }
+
+    private void cancelBatch() {
+        BatchHandle handle = this.batchHandle;
+        if (handle != null) {
+            handle.cancel();
+        }
+        this.status = "Cancel requested. Waiting for in-flight prefabs to complete...";
     }
 
     private void handleBatchFinished(
         @Nonnull AssetPack targetPack,
+        @Nonnull OptimizerSettings settings,
         PrefabOptimizationResult result,
         Throwable throwable
     ) {
         this.batchRunning = false;
+        this.batchHandle = null;
         if (throwable != null) {
             this.status = "Prefab batch failed: " + ThrowableMessages.readableMessage(ThrowableMessages.rootCause(throwable));
             this.playerRef.sendMessage(Message.raw("PrefabOptimizer-Extended: " + this.status));
+            this.sendStatusUpdate();
             return;
         }
 
-        this.status = "Saved " + result.savedCount() + "/" + result.sourceCount()
-            + " prefabs to " + targetPack.getName()
-            + " and removed " + result.removedBlocks() + "/" + result.processedBlocks()
+        String verb = settings.previewOnly() ? "Preview:" : "Saved";
+        String outcome = settings.previewOnly()
+            ? "would save " + result.savedCount() + "/" + result.sourceCount() + " prefabs to " + targetPack.getName()
+            : result.savedCount() + "/" + result.sourceCount() + " prefabs saved to " + targetPack.getName();
+        this.status = verb + " " + outcome
+            + " and " + (settings.previewOnly() ? "would remove " : "removed ") + result.removedBlocks() + "/" + result.processedBlocks()
             + " blocks (" + formatPercentage(result.removedBlockPercentage()) + " optimized).";
         this.playerRef.sendMessage(Message.raw("PrefabOptimizer-Extended: " + this.status));
         for (String warning : result.warnings()) {
             this.playerRef.sendMessage(Message.raw("PrefabOptimizer-Extended warning: " + warning));
         }
+        this.sendStatusUpdate();
+    }
+
+    private void appendExclusion(@Nonnull String tokens) {
+        String current = this.excludedBlocks == null ? "" : this.excludedBlocks.trim();
+        this.excludedBlocks = current.isBlank() ? tokens : current + "," + tokens;
+        this.sendExclusionUpdate();
+    }
+
+    private void sendExclusionUpdate() {
+        UICommandBuilder ui = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        this.bindStaticActions(events);
+        ui.set("#ExcludedBlocks.Value", this.excludedBlocks);
+        this.sendUpdate(ui, events, false);
+    }
+
+    private void sendBlockSuggestionsUpdate() {
+        UICommandBuilder ui = new UICommandBuilder();
+        UIEventBuilder events = new UIEventBuilder();
+        this.bindStaticActions(events);
+        this.buildBlockSuggestions(ui, events);
+        this.sendUpdate(ui, events, false);
     }
 
     private void sendSourceUpdate() {
@@ -365,12 +497,20 @@ public final class PrefabOptimizerPage extends InteractiveCustomUIPage<Optimizer
     }
 
     @Nonnull
+    private static EventData presetData(@Nonnull Action action) {
+        return actionData(action).put(OptimizerEventData.KEY_EXCLUDED_BLOCKS, "#ExcludedBlocks.Value");
+    }
+
+    @Nonnull
     private static EventData settingsActionData(@Nonnull Action action) {
         return actionData(action)
             .put(OptimizerEventData.KEY_PRESERVE_TRANSPARENT, "#PreserveTransparent.Value")
             .put(OptimizerEventData.KEY_STRICT_CUBE_ONLY, "#StrictCubeOnly.Value")
             .put(OptimizerEventData.KEY_PRESERVE_FLUID_ADJACENT, "#PreserveFluidAdjacent.Value")
             .put(OptimizerEventData.KEY_FLOOD_FILL_INTERIOR, "#FloodFillInterior.Value")
+            .put(OptimizerEventData.KEY_SHELL_THICKNESS, "#ShellThickness.Value")
+            .put(OptimizerEventData.KEY_SKIP_BOTTOM_FACE, "#SkipBottomFace.Value")
+            .put(OptimizerEventData.KEY_PREVIEW_ONLY, "#PreviewOnly.Value")
             .put(OptimizerEventData.KEY_EXCLUDED_BLOCKS, "#ExcludedBlocks.Value")
             .put(OptimizerEventData.KEY_RECURSIVE_FOLDERS, "#RecursiveFolders.Value")
             .put(OptimizerEventData.KEY_TARGET_PACK, "#TargetPack.Value")
@@ -410,6 +550,10 @@ public final class PrefabOptimizerPage extends InteractiveCustomUIPage<Optimizer
         ADD_CURRENT_FOLDER,
         CLEAR_SOURCES,
         REMOVE_SOURCE,
-        OPTIMIZE_PREFABS
+        OPTIMIZE_PREFABS,
+        ADD_FLUIDS,
+        ADD_DECOR,
+        CLEAR_EXCLUDED,
+        ADD_BLOCK_TOKEN
     }
 }
