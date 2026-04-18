@@ -7,7 +7,9 @@ import com.hypixel.hytale.server.core.universe.world.accessor.BlockAccessor;
 import com.hypixel.hytale.server.core.universe.world.accessor.ChunkAccessor;
 import it.unimi.dsi.fastutil.ints.Int2BooleanMap;
 import it.unimi.dsi.fastutil.ints.Int2BooleanOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 @SuppressWarnings({"deprecation", "rawtypes", "removal"})
 public final class OccludedBlockMask extends BlockMask {
@@ -23,11 +25,22 @@ public final class OccludedBlockMask extends BlockMask {
     private final BlockClassifier classifier;
     private final OptimizerSettings settings;
     private final Int2BooleanMap classifierCache = new Int2BooleanOpenHashMap();
+    @Nullable
+    private final LongSet reachableAir;
 
     public OccludedBlockMask(@Nonnull BlockClassifier classifier, @Nonnull OptimizerSettings settings) {
+        this(classifier, settings, null);
+    }
+
+    public OccludedBlockMask(
+        @Nonnull BlockClassifier classifier,
+        @Nonnull OptimizerSettings settings,
+        @Nullable LongSet reachableAir
+    ) {
         super(BlockFilter.EMPTY_ARRAY);
         this.classifier = classifier;
         this.settings = settings;
+        this.reachableAir = reachableAir;
     }
 
     @Override
@@ -70,6 +83,25 @@ public final class OccludedBlockMask extends BlockMask {
         }
 
         boolean preserveFluidAdjacent = this.settings.preserveFluidAdjacentBlocks();
+
+        if (this.reachableAir != null) {
+            for (int[] neighbor : NEIGHBORS) {
+                int nx = x + neighbor[0];
+                int ny = y + neighbor[1];
+                int nz = z + neighbor[2];
+                if (this.reachableAir.contains(SelectionFloodFill.packPos(nx, ny, nz))) {
+                    return false;
+                }
+                if (preserveFluidAdjacent && bounds.contains(nx, ny, nz)) {
+                    BlockAccessor chunk = (BlockAccessor) accessor.getChunk(ChunkUtil.indexChunkFromBlock(nx, nz));
+                    if (chunk != null && chunk.getFluidId(nx, ny, nz) != 0) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
         for (int[] neighbor : NEIGHBORS) {
             int nx = x + neighbor[0];
             int ny = y + neighbor[1];
@@ -91,7 +123,7 @@ public final class OccludedBlockMask extends BlockMask {
         return true;
     }
 
-    private boolean classify(int blockId) {
+    boolean classify(int blockId) {
         synchronized (this.classifierCache) {
             if (this.classifierCache.containsKey(blockId)) {
                 return this.classifierCache.get(blockId);

@@ -121,6 +121,28 @@ Enabled by default.
 
 When enabled, only `DrawType.Cube` blocks can be removed. When disabled, `DrawType.CubeWithModel` can also be considered if the block is otherwise solid and not excluded.
 
+### Preserve blocks next to water / lava
+
+Enabled by default.
+
+When enabled, any block whose six-direct-neighbor position contains a fluid voxel is preserved even if the block itself would otherwise be classified as removable. This keeps pond floors, aquarium walls, lava channels, and other fluid containers intact. Disable this only if you are sure your prefab has no fluids, or if you explicitly want to strip them.
+
+### Flood-fill interior mode
+
+Disabled by default. More aggressive than the standard mode — opt in when you want maximum compression.
+
+The default mode only removes blocks whose six direct neighbors are all themselves optimizable full-cube blocks. That leaves a lot of hidden volume behind: any block next to a small air pocket, a curved wall, or a sloped surface fails the strict six-neighbor test even when no player could ever see it.
+
+Flood-fill mode runs a 3D BFS starting from the exterior of the selection/prefab bounding box. It propagates through every position that is not an optimizable occluder — air, glass, transparent decorative blocks, fluids, and so on. Any optimizable block whose six neighbors are all *unreachable* from the exterior is considered interior and removed.
+
+This correctly strips:
+
+- Thick walls with irregular or sloped interior surfaces.
+- Hollow pockets that are fully enclosed (the pocket stays, but the shell gets thinner).
+- Dense solid masses (mountains, cliffs, large statues) where six-neighbor left one-block-thick inner shells.
+
+The `Preserve blocks next to water / lava` and `Exclude blocks` settings still apply in this mode, so fluids and user-excluded blocks remain safe.
+
 ### Exclude blocks
 
 Use this field to protect specific block IDs from removal.
@@ -149,10 +171,11 @@ A block is removable only when all of the following are true:
 - The block passes the transparent/non-opaque setting.
 - The block passes the draw type setting.
 - The block is not a filler block.
-- All six direct neighbors are inside the selected/prefab bounds.
-- All six direct neighbors are also optimizable full-cube blocks.
+- No neighbor position contains a fluid (when "Preserve blocks next to water / lava" is enabled).
+- **Default mode:** all six direct neighbors are inside the selected/prefab bounds, and all six direct neighbors are also optimizable full-cube blocks.
+- **Flood-fill interior mode:** none of the six neighbors are reachable from the exterior of the bounding box through non-occluding positions (air, transparent blocks, fluids, etc.).
 
-This intentionally conservative default mode avoids removing exposed or structurally important visible blocks. The Extended fork keeps this as the default and adds opt-in modes for more aggressive removal.
+The default mode is intentionally conservative and avoids removing exposed or structurally important visible blocks. Flood-fill interior mode removes strictly more blocks than default mode and is gated behind a checkbox.
 
 ## Project Structure
 

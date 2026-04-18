@@ -24,6 +24,10 @@ This version forks the original [PrefabOptimizer by Theobosse / ninesliced](http
 
 - **Invalid exclusion regex now surfaces a warning** instead of silently falling back to token matching. `OptimizerSettings` captures the `PatternSyntaxException` description, the batch optimizer adds it to the result's warning list, and the selection optimizer sends it as a chat message before queueing the BuilderTools operation.
 
+### Added
+
+- **Flood-fill interior optimization mode (opt-in).** New "Flood-fill interior mode" checkbox in both the Selection and Prefab Batch Optimizer UIs, disabled by default. When enabled, a 3D BFS seeded from the exterior of the bounding box propagates through air, transparent blocks, and fluids; any optimizable block whose six neighbor positions are all unreachable from the exterior is considered interior and removed. This catches thick walls with sloped inner surfaces, dense solid masses, and other geometries where the default six-neighbor rule left a one-block-thick inner shell. The `Preserve blocks next to water / lava` and `Exclude blocks` safeguards continue to apply in flood-fill mode. Prefab path uses the pre-built block index; selection path uses a separate `SelectionFloodFill` helper driven by the `ChunkAccessor`.
+
 ### Changed
 
 - Rebranded artifact: `dev.ninesliced:PrefabOptimizer` → `dev.lewai:PrefabOptimizer-Extended`.

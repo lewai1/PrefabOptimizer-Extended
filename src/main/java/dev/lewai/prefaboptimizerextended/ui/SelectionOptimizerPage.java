@@ -88,6 +88,7 @@ public final class SelectionOptimizerPage extends InteractiveCustomUIPage<Select
             .put(SelectionEventData.KEY_PRESERVE_TRANSPARENT, "#PreserveTransparent.Value")
             .put(SelectionEventData.KEY_STRICT_CUBE_ONLY, "#StrictCubeOnly.Value")
             .put(SelectionEventData.KEY_PRESERVE_FLUID_ADJACENT, "#PreserveFluidAdjacent.Value")
+            .put(SelectionEventData.KEY_FLOOD_FILL_INTERIOR, "#FloodFillInterior.Value")
             .put(SelectionEventData.KEY_EXCLUDED_BLOCKS, "#ExcludedBlocks.Value");
     }
 

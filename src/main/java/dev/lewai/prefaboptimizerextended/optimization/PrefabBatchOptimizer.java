@@ -10,6 +10,8 @@ import it.unimi.dsi.fastutil.ints.Int2BooleanMap;
 import it.unimi.dsi.fastutil.ints.Int2BooleanOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.nio.file.Path;
@@ -25,6 +27,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nonnull;
 
 final class PrefabBatchOptimizer {
+    private static final int[][] NEIGHBORS = {
+        {1, 0, 0}, {-1, 0, 0},
+        {0, 1, 0}, {0, -1, 0},
+        {0, 0, 1}, {0, 0, -1}
+    };
+
     private final BlockClassifier classifier;
     private final PrefabSourceCollector sourceCollector;
     private final ForkJoinPool executor;
@@ -113,6 +121,9 @@ final class PrefabBatchOptimizer {
             ? collectFluidNeighborhood(original)
             : Set.of();
         Int2BooleanMap classifierCache = new Int2BooleanOpenHashMap();
+        LongSet reachableAir = settings.floodFillInterior()
+            ? this.computeReachableAir(index, settings, classifierCache)
+            : null;
 
         int[] removedBlocks = {0};
         int[] processedBlocks = {0};
@@ -121,7 +132,7 @@ final class PrefabBatchOptimizer {
             if (block.blockId() > 0 && block.filler() == 0) {
                 processedBlocks[0]++;
             }
-            if (this.isPrefabBlockRemovable(block, x, y, z, settings, fluidNeighborhood, index, classifierCache)) {
+            if (this.isPrefabBlockRemovable(block, x, y, z, settings, fluidNeighborhood, index, classifierCache, reachableAir)) {
                 removedBlocks[0]++;
                 return;
             }
@@ -166,6 +177,83 @@ final class PrefabBatchOptimizer {
         return positions;
     }
 
+    @Nonnull
+    private LongSet computeReachableAir(
+        @Nonnull PrefabBlockIndex index,
+        @Nonnull OptimizerSettings settings,
+        @Nonnull Int2BooleanMap classifierCache
+    ) {
+        int xMin = Integer.MAX_VALUE, yMin = Integer.MAX_VALUE, zMin = Integer.MAX_VALUE;
+        int xMax = Integer.MIN_VALUE, yMax = Integer.MIN_VALUE, zMax = Integer.MIN_VALUE;
+        LongIterator keys = index.blockIds().keySet().iterator();
+        while (keys.hasNext()) {
+            long key = keys.nextLong();
+            int x = unpackX(key), y = unpackY(key), z = unpackZ(key);
+            if (x < xMin) xMin = x; if (x > xMax) xMax = x;
+            if (y < yMin) yMin = y; if (y > yMax) yMax = y;
+            if (z < zMin) zMin = z; if (z > zMax) zMax = z;
+        }
+        LongIterator fillers = index.nonZeroFillers().iterator();
+        while (fillers.hasNext()) {
+            long key = fillers.nextLong();
+            int x = unpackX(key), y = unpackY(key), z = unpackZ(key);
+            if (x < xMin) xMin = x; if (x > xMax) xMax = x;
+            if (y < yMin) yMin = y; if (y > yMax) yMax = y;
+            if (z < zMin) zMin = z; if (z > zMax) zMax = z;
+        }
+        if (xMin > xMax) {
+            return LongSet.of();
+        }
+
+        int minX = xMin - 1, maxX = xMax + 1;
+        int minY = yMin - 1, maxY = yMax + 1;
+        int minZ = zMin - 1, maxZ = zMax + 1;
+
+        LongOpenHashSet reached = new LongOpenHashSet();
+        LongArrayFIFOQueue queue = new LongArrayFIFOQueue();
+        long seed = packPos(minX, minY, minZ);
+        reached.add(seed);
+        queue.enqueue(seed);
+
+        while (!queue.isEmpty()) {
+            long key = queue.dequeueLong();
+            int x = unpackX(key), y = unpackY(key), z = unpackZ(key);
+            for (int[] d : NEIGHBORS) {
+                int nx = x + d[0], ny = y + d[1], nz = z + d[2];
+                if (nx < minX || nx > maxX || ny < minY || ny > maxY || nz < minZ || nz > maxZ) {
+                    continue;
+                }
+                long nkey = packPos(nx, ny, nz);
+                if (reached.contains(nkey)) {
+                    continue;
+                }
+                if (this.isPrefabOccluder(nx, ny, nz, index, settings, classifierCache)) {
+                    continue;
+                }
+                reached.add(nkey);
+                queue.enqueue(nkey);
+            }
+        }
+        return reached;
+    }
+
+    private boolean isPrefabOccluder(
+        int x, int y, int z,
+        @Nonnull PrefabBlockIndex index,
+        @Nonnull OptimizerSettings settings,
+        @Nonnull Int2BooleanMap classifierCache
+    ) {
+        long key = packPos(x, y, z);
+        if (index.nonZeroFillers().contains(key)) {
+            return true;
+        }
+        int blockId = index.blockIds().get(key);
+        if (blockId <= 0) {
+            return false;
+        }
+        return this.classify(blockId, settings, classifierCache);
+    }
+
     private boolean isPrefabBlockRemovable(
         @Nonnull BlockSelection.BlockHolder block,
         int x,
@@ -174,13 +262,23 @@ final class PrefabBatchOptimizer {
         @Nonnull OptimizerSettings settings,
         @Nonnull Set<Long> fluidNeighborhood,
         @Nonnull PrefabBlockIndex index,
-        @Nonnull Int2BooleanMap classifierCache
+        @Nonnull Int2BooleanMap classifierCache,
+        LongSet reachableAir
     ) {
         if (block.filler() != 0 || !this.classify(block.blockId(), settings, classifierCache)) {
             return false;
         }
         if (settings.preserveFluidAdjacentBlocks() && fluidNeighborhood.contains(packPos(x, y, z))) {
             return false;
+        }
+
+        if (reachableAir != null) {
+            for (int[] d : NEIGHBORS) {
+                if (reachableAir.contains(packPos(x + d[0], y + d[1], z + d[2]))) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         return this.isNeighborSolid(x + 1, y, z, settings, index, classifierCache)
@@ -224,6 +322,18 @@ final class PrefabBatchOptimizer {
         long ly = ((long) y) & 0x1FFFFFL;
         long lz = ((long) z) & 0x1FFFFFL;
         return (lx << 42) | (ly << 21) | lz;
+    }
+
+    private static int unpackX(long key) {
+        return (int) ((key << 1) >> 43);
+    }
+
+    private static int unpackY(long key) {
+        return (int) ((key << 22) >> 43);
+    }
+
+    private static int unpackZ(long key) {
+        return (int) ((key << 43) >> 43);
     }
 
     @Nonnull

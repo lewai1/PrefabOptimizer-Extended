@@ -144,6 +144,11 @@ $C.@PageOverlay {
             Label { Text: "Preserve blocks next to water / lava (recommended to avoid fluids leaking)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
           }
 
+          Group { LayoutMode: Left; Anchor: (Height: 28);
+            $C.@CheckBox #FloodFillInterior { Anchor: (Width: 28, Height: 28); Value: false; }
+            Label { Text: "Flood-fill interior mode (remove anything unreachable from outside, more aggressive)"; Style: (FontSize: 12, TextColor: @SoftText); FlexWeight: 1; }
+          }
+
           Label {
             Text: "Exclude blocks by regex, or comma-separated text tokens";
             Style: (FontSize: 12, TextColor: #9ab2bc);

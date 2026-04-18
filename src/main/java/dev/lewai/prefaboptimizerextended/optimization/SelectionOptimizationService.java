@@ -15,9 +15,11 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.accessor.LocalCachedChunkAccessor;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import java.lang.reflect.Method;
 import java.util.Locale;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 final class SelectionOptimizationService {
     private final BlockClassifier classifier;
@@ -51,8 +53,24 @@ final class SelectionOptimizationService {
                 return;
             }
 
-            OccludedBlockMask mask = new OccludedBlockMask(this.classifier, settings);
-            SelectionStats stats = this.countSelectionStats(selection, mask, componentAccessor);
+            BlockBounds bounds = SelectionBoundsReader.read(selection);
+            World world = componentAccessor.getExternalData().getWorld();
+            LocalCachedChunkAccessor accessor = LocalCachedChunkAccessor.atWorldCoords(
+                world,
+                bounds.centerX(),
+                bounds.centerZ(),
+                Math.max(bounds.width(), bounds.depth()) + 2
+            );
+
+            OccludedBlockMask primingMask = new OccludedBlockMask(this.classifier, settings);
+            LongSet reachableAir = settings.floodFillInterior()
+                ? SelectionFloodFill.computeReachableAir(accessor, bounds, primingMask)
+                : null;
+            OccludedBlockMask mask = reachableAir == null
+                ? primingMask
+                : new OccludedBlockMask(this.classifier, settings, reachableAir);
+
+            SelectionStats stats = countSelectionStats(selection, mask, accessor, bounds);
             if (stats.removedBlocks() <= 0) {
                 playerRef.sendMessage(Message.raw(
                     "PrefabOptimizer-Extended finished: removed 0/" + stats.processedBlocks()
@@ -92,6 +110,7 @@ final class SelectionOptimizationService {
         return true;
     }
 
+    @Nullable
     private static Boolean invokeBuilderToolsSelectionCheck(
         @Nonnull Ref<EntityStore> ref,
         @Nonnull Store<EntityStore> store,
@@ -117,19 +136,12 @@ final class SelectionOptimizationService {
     }
 
     @SuppressWarnings("removal")
-    private SelectionStats countSelectionStats(
+    private static SelectionStats countSelectionStats(
         @Nonnull BlockSelection selection,
         @Nonnull OccludedBlockMask mask,
-        @Nonnull ComponentAccessor<EntityStore> componentAccessor
+        @Nonnull LocalCachedChunkAccessor accessor,
+        @Nonnull BlockBounds bounds
     ) {
-        BlockBounds bounds = SelectionBoundsReader.read(selection);
-        World world = componentAccessor.getExternalData().getWorld();
-        LocalCachedChunkAccessor accessor = LocalCachedChunkAccessor.atWorldCoords(
-            world,
-            bounds.centerX(),
-            bounds.centerZ(),
-            Math.max(bounds.width(), bounds.depth()) + 2
-        );
         int processedBlocks = 0;
         int removedBlocks = 0;
         for (int x = bounds.xMin(); x <= bounds.xMax(); x++) {

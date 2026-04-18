@@ -14,6 +14,7 @@ public final class OptimizerSettings {
     private final boolean preserveTransparentBlocks;
     private final boolean strictCubeOnly;
     private final boolean preserveFluidAdjacentBlocks;
+    private final boolean floodFillInterior;
     private final String excludedBlocksRaw;
     @Nullable
     private final Pattern excludedBlocksPattern;
@@ -25,6 +26,7 @@ public final class OptimizerSettings {
         boolean preserveTransparentBlocks,
         boolean strictCubeOnly,
         boolean preserveFluidAdjacentBlocks,
+        boolean floodFillInterior,
         @Nonnull String excludedBlocksRaw,
         @Nullable Pattern excludedBlocksPattern,
         @Nonnull List<String> excludedBlockTokens,
@@ -33,6 +35,7 @@ public final class OptimizerSettings {
         this.preserveTransparentBlocks = preserveTransparentBlocks;
         this.strictCubeOnly = strictCubeOnly;
         this.preserveFluidAdjacentBlocks = preserveFluidAdjacentBlocks;
+        this.floodFillInterior = floodFillInterior;
         this.excludedBlocksRaw = excludedBlocksRaw;
         this.excludedBlocksPattern = excludedBlocksPattern;
         this.excludedBlockTokens = List.copyOf(excludedBlockTokens);
@@ -43,6 +46,7 @@ public final class OptimizerSettings {
         @Nullable Boolean preserveTransparentBlocks,
         @Nullable Boolean strictCubeOnly,
         @Nullable Boolean preserveFluidAdjacentBlocks,
+        @Nullable Boolean floodFillInterior,
         @Nullable String excludedBlocksRaw
     ) {
         String raw = excludedBlocksRaw == null ? "" : excludedBlocksRaw.trim();
@@ -52,6 +56,7 @@ public final class OptimizerSettings {
             preserveTransparentBlocks == null || preserveTransparentBlocks,
             strictCubeOnly == null || strictCubeOnly,
             preserveFluidAdjacentBlocks == null || preserveFluidAdjacentBlocks,
+            floodFillInterior != null && floodFillInterior,
             raw,
             exclusionRules.pattern(),
             exclusionRules.tokens(),
@@ -69,6 +74,10 @@ public final class OptimizerSettings {
 
     public boolean preserveFluidAdjacentBlocks() {
         return this.preserveFluidAdjacentBlocks;
+    }
+
+    public boolean floodFillInterior() {
+        return this.floodFillInterior;
     }
 
     @Nonnull
