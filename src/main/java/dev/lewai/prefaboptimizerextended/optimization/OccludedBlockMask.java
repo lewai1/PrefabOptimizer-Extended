@@ -66,23 +66,26 @@ public final class OccludedBlockMask extends BlockMask {
             return false;
         }
 
+        boolean preserveFluidAdjacent = this.settings.preserveFluidAdjacentBlocks();
         for (int[] neighbor : NEIGHBORS) {
             int nx = x + neighbor[0];
             int ny = y + neighbor[1];
             int nz = z + neighbor[2];
-            if (!bounds.contains(nx, ny, nz) || !this.isSolidNeighbor(accessor, nx, ny, nz)) {
+            if (!bounds.contains(nx, ny, nz)) {
+                return false;
+            }
+            BlockAccessor chunk = (BlockAccessor) accessor.getChunk(ChunkUtil.indexChunkFromBlock(nx, nz));
+            if (chunk == null || chunk.getFiller(nx, ny, nz) != 0) {
+                return false;
+            }
+            if (preserveFluidAdjacent && chunk.getFluidId(nx, ny, nz) != 0) {
+                return false;
+            }
+            if (!this.classifier.isOptimizableFullCube(chunk.getBlock(nx, ny, nz), this.settings)) {
                 return false;
             }
         }
         return true;
-    }
-
-    private boolean isSolidNeighbor(@Nonnull ChunkAccessor accessor, int x, int y, int z) {
-        BlockAccessor chunk = (BlockAccessor) accessor.getChunk(ChunkUtil.indexChunkFromBlock(x, z));
-        if (chunk == null || chunk.getFiller(x, y, z) != 0) {
-            return false;
-        }
-        return this.classifier.isOptimizableFullCube(chunk.getBlock(x, y, z), this.settings);
     }
 
     private static BlockBounds toBounds(

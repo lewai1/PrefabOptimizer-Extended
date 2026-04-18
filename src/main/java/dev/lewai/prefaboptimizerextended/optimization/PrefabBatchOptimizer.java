@@ -9,7 +9,9 @@ import dev.lewai.prefaboptimizerextended.util.ThrowableMessages;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -90,11 +92,15 @@ final class PrefabBatchOptimizer {
         AtomicInteger processedBlocks = new AtomicInteger();
         optimized.copyPropertiesFrom(original);
 
+        Set<Long> fluidNeighborhood = settings.preserveFluidAdjacentBlocks()
+            ? collectFluidNeighborhood(original)
+            : Set.of();
+
         original.forEachBlock((x, y, z, block) -> {
             if (block.blockId() > 0 && block.filler() == 0) {
                 processedBlocks.incrementAndGet();
             }
-            if (this.isPrefabBlockRemovable(original, block, x, y, z, settings)) {
+            if (this.isPrefabBlockRemovable(original, block, x, y, z, settings, fluidNeighborhood)) {
                 removedBlocks.incrementAndGet();
                 return;
             }
@@ -109,15 +115,34 @@ final class PrefabBatchOptimizer {
         return new OptimizedPrefab(optimized, removedBlocks.get(), processedBlocks.get());
     }
 
+    @Nonnull
+    private static Set<Long> collectFluidNeighborhood(@Nonnull BlockSelection selection) {
+        Set<Long> positions = new HashSet<>();
+        selection.forEachFluid((x, y, z, fluidId, fluidLevel) -> {
+            positions.add(packPos(x, y, z));
+            positions.add(packPos(x + 1, y, z));
+            positions.add(packPos(x - 1, y, z));
+            positions.add(packPos(x, y + 1, z));
+            positions.add(packPos(x, y - 1, z));
+            positions.add(packPos(x, y, z + 1));
+            positions.add(packPos(x, y, z - 1));
+        });
+        return positions;
+    }
+
     private boolean isPrefabBlockRemovable(
         @Nonnull BlockSelection selection,
         @Nonnull BlockSelection.BlockHolder block,
         int x,
         int y,
         int z,
-        @Nonnull OptimizerSettings settings
+        @Nonnull OptimizerSettings settings,
+        @Nonnull Set<Long> fluidNeighborhood
     ) {
         if (block.filler() != 0 || !this.classifier.isOptimizableFullCube(block.blockId(), settings)) {
+            return false;
+        }
+        if (settings.preserveFluidAdjacentBlocks() && fluidNeighborhood.contains(packPos(x, y, z))) {
             return false;
         }
 
@@ -144,6 +169,13 @@ final class PrefabBatchOptimizer {
         return block != null
             && block.filler() == 0
             && this.classifier.isOptimizableFullCube(block.blockId(), settings);
+    }
+
+    private static long packPos(int x, int y, int z) {
+        long lx = ((long) x) & 0x1FFFFFL;
+        long ly = ((long) y) & 0x1FFFFFL;
+        long lz = ((long) z) & 0x1FFFFFL;
+        return (lx << 42) | (ly << 21) | lz;
     }
 
     @Nonnull

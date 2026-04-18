@@ -9,21 +9,29 @@ public final class SelectionEventData {
     static final String KEY_ACTION = "Action";
     static final String KEY_PRESERVE_TRANSPARENT = "@PreserveTransparent";
     static final String KEY_STRICT_CUBE_ONLY = "@StrictCubeOnly";
+    static final String KEY_PRESERVE_FLUID_ADJACENT = "@PreserveFluidAdjacent";
     static final String KEY_EXCLUDED_BLOCKS = "@ExcludedBlocks";
 
     public String action;
     public Boolean preserveTransparent;
     public Boolean strictCubeOnly;
+    public Boolean preserveFluidAdjacent;
     public String excludedBlocks;
 
     public OptimizerSettings toSettings() {
-        return OptimizerSettings.create(this.preserveTransparent, this.strictCubeOnly, this.excludedBlocks);
+        return OptimizerSettings.create(
+            this.preserveTransparent,
+            this.strictCubeOnly,
+            this.preserveFluidAdjacent,
+            this.excludedBlocks
+        );
     }
 
     public static final BuilderCodec<SelectionEventData> CODEC = BuilderCodec.<SelectionEventData>builder(SelectionEventData.class, SelectionEventData::new)
         .append(new KeyedCodec<>(KEY_ACTION, Codec.STRING), (data, value) -> data.action = value, data -> data.action).add()
         .append(new KeyedCodec<>(KEY_PRESERVE_TRANSPARENT, Codec.BOOLEAN), (data, value) -> data.preserveTransparent = value, data -> data.preserveTransparent).add()
         .append(new KeyedCodec<>(KEY_STRICT_CUBE_ONLY, Codec.BOOLEAN), (data, value) -> data.strictCubeOnly = value, data -> data.strictCubeOnly).add()
+        .append(new KeyedCodec<>(KEY_PRESERVE_FLUID_ADJACENT, Codec.BOOLEAN), (data, value) -> data.preserveFluidAdjacent = value, data -> data.preserveFluidAdjacent).add()
         .append(new KeyedCodec<>(KEY_EXCLUDED_BLOCKS, Codec.STRING), (data, value) -> data.excludedBlocks = value, data -> data.excludedBlocks).add()
         .build();
 }

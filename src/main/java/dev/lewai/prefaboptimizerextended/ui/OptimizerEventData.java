@@ -13,6 +13,7 @@ public final class OptimizerEventData {
     static final String KEY_SOURCE = "Source";
     static final String KEY_PRESERVE_TRANSPARENT = "@PreserveTransparent";
     static final String KEY_STRICT_CUBE_ONLY = "@StrictCubeOnly";
+    static final String KEY_PRESERVE_FLUID_ADJACENT = "@PreserveFluidAdjacent";
     static final String KEY_EXCLUDED_BLOCKS = "@ExcludedBlocks";
     static final String KEY_RECURSIVE_FOLDERS = "@RecursiveFolders";
     static final String KEY_TARGET_PACK = "@TargetPack";
@@ -25,13 +26,19 @@ public final class OptimizerEventData {
     public String source;
     public Boolean preserveTransparent;
     public Boolean strictCubeOnly;
+    public Boolean preserveFluidAdjacent;
     public String excludedBlocks;
     public Boolean recursiveFolders;
     public String targetPack;
     public String targetFolder;
 
     public OptimizerSettings toSettings() {
-        return OptimizerSettings.create(this.preserveTransparent, this.strictCubeOnly, this.excludedBlocks);
+        return OptimizerSettings.create(
+            this.preserveTransparent,
+            this.strictCubeOnly,
+            this.preserveFluidAdjacent,
+            this.excludedBlocks
+        );
     }
 
     public static final BuilderCodec<OptimizerEventData> CODEC = BuilderCodec.<OptimizerEventData>builder(OptimizerEventData.class, OptimizerEventData::new)
@@ -42,6 +49,7 @@ public final class OptimizerEventData {
         .append(new KeyedCodec<>(KEY_SOURCE, Codec.STRING), (data, value) -> data.source = value, data -> data.source).add()
         .append(new KeyedCodec<>(KEY_PRESERVE_TRANSPARENT, Codec.BOOLEAN), (data, value) -> data.preserveTransparent = value, data -> data.preserveTransparent).add()
         .append(new KeyedCodec<>(KEY_STRICT_CUBE_ONLY, Codec.BOOLEAN), (data, value) -> data.strictCubeOnly = value, data -> data.strictCubeOnly).add()
+        .append(new KeyedCodec<>(KEY_PRESERVE_FLUID_ADJACENT, Codec.BOOLEAN), (data, value) -> data.preserveFluidAdjacent = value, data -> data.preserveFluidAdjacent).add()
         .append(new KeyedCodec<>(KEY_EXCLUDED_BLOCKS, Codec.STRING), (data, value) -> data.excludedBlocks = value, data -> data.excludedBlocks).add()
         .append(new KeyedCodec<>(KEY_RECURSIVE_FOLDERS, Codec.BOOLEAN), (data, value) -> data.recursiveFolders = value, data -> data.recursiveFolders).add()
         .append(new KeyedCodec<>(KEY_TARGET_PACK, Codec.STRING), (data, value) -> data.targetPack = value, data -> data.targetPack).add()

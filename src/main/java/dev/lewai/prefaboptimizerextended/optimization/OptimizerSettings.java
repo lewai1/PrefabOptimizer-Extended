@@ -13,6 +13,7 @@ public final class OptimizerSettings {
 
     private final boolean preserveTransparentBlocks;
     private final boolean strictCubeOnly;
+    private final boolean preserveFluidAdjacentBlocks;
     private final String excludedBlocksRaw;
     @Nullable
     private final Pattern excludedBlocksPattern;
@@ -21,12 +22,14 @@ public final class OptimizerSettings {
     private OptimizerSettings(
         boolean preserveTransparentBlocks,
         boolean strictCubeOnly,
+        boolean preserveFluidAdjacentBlocks,
         @Nonnull String excludedBlocksRaw,
         @Nullable Pattern excludedBlocksPattern,
         @Nonnull List<String> excludedBlockTokens
     ) {
         this.preserveTransparentBlocks = preserveTransparentBlocks;
         this.strictCubeOnly = strictCubeOnly;
+        this.preserveFluidAdjacentBlocks = preserveFluidAdjacentBlocks;
         this.excludedBlocksRaw = excludedBlocksRaw;
         this.excludedBlocksPattern = excludedBlocksPattern;
         this.excludedBlockTokens = List.copyOf(excludedBlockTokens);
@@ -35,6 +38,7 @@ public final class OptimizerSettings {
     public static OptimizerSettings create(
         @Nullable Boolean preserveTransparentBlocks,
         @Nullable Boolean strictCubeOnly,
+        @Nullable Boolean preserveFluidAdjacentBlocks,
         @Nullable String excludedBlocksRaw
     ) {
         String raw = excludedBlocksRaw == null ? "" : excludedBlocksRaw.trim();
@@ -43,6 +47,7 @@ public final class OptimizerSettings {
         return new OptimizerSettings(
             preserveTransparentBlocks == null || preserveTransparentBlocks,
             strictCubeOnly == null || strictCubeOnly,
+            preserveFluidAdjacentBlocks == null || preserveFluidAdjacentBlocks,
             raw,
             exclusionRules.pattern(),
             exclusionRules.tokens()
@@ -55,6 +60,10 @@ public final class OptimizerSettings {
 
     public boolean strictCubeOnly() {
         return this.strictCubeOnly;
+    }
+
+    public boolean preserveFluidAdjacentBlocks() {
+        return this.preserveFluidAdjacentBlocks;
     }
 
     @Nonnull

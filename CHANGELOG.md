@@ -10,6 +10,10 @@ This project currently follows the version from `manifest.json` and `build.gradl
 
 This version forks the original [PrefabOptimizer by Theobosse / ninesliced](https://ninesliced.com) and renames the project to **PrefabOptimizer-Extended**. The AGPL-3.0 license is unchanged and all upstream credit is preserved.
 
+### Fixed
+
+- **Fluid-adjacent blocks are no longer silently removed.** Upstream 0.1.0 could remove blocks that sit directly next to water or lava voxels, because the six-neighbor check only looked at other blocks and ignored the fluid layer. The result was water/lava appearing to "leak" or vanish from optimized prefabs. A new setting **"Preserve blocks next to water / lava"** (enabled by default) pre-scans fluid positions and refuses to remove any block whose 6-neighbor position contains a fluid. The same check applies to the selection optimizer via a fluid-aware `OccludedBlockMask`.
+
 ### Changed
 
 - Rebranded artifact: `dev.ninesliced:PrefabOptimizer` → `dev.lewai:PrefabOptimizer-Extended`.

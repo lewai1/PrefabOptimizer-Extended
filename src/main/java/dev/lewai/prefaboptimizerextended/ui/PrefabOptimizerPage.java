@@ -369,6 +369,7 @@ public final class PrefabOptimizerPage extends InteractiveCustomUIPage<Optimizer
         return actionData(action)
             .put(OptimizerEventData.KEY_PRESERVE_TRANSPARENT, "#PreserveTransparent.Value")
             .put(OptimizerEventData.KEY_STRICT_CUBE_ONLY, "#StrictCubeOnly.Value")
+            .put(OptimizerEventData.KEY_PRESERVE_FLUID_ADJACENT, "#PreserveFluidAdjacent.Value")
             .put(OptimizerEventData.KEY_EXCLUDED_BLOCKS, "#ExcludedBlocks.Value")
             .put(OptimizerEventData.KEY_RECURSIVE_FOLDERS, "#RecursiveFolders.Value")
             .put(OptimizerEventData.KEY_TARGET_PACK, "#TargetPack.Value")

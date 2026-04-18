@@ -68,6 +68,11 @@ $C.@PageOverlay {
           Label { Text: "Default mode: only remove DrawType.Cube blocks"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; }
         }
 
+        Group { LayoutMode: Left; Anchor: (Height: 32);
+          $C.@CheckBox #PreserveFluidAdjacent { Anchor: (Width: 28, Height: 28); Value: true; }
+          Label { Text: "Preserve blocks next to water / lava (recommended to avoid fluids leaking)"; Style: (FontSize: 13, TextColor: @SoftText); FlexWeight: 1; }
+        }
+
         Label {
           Text: "Exclude blocks by regex, or comma-separated text tokens";
           Style: (FontSize: 12, TextColor: #9ab2bc);
